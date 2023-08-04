@@ -60,9 +60,11 @@ void HandleEvent(SDL_Event* event, bool* running, bool* draw_rectangle) {
       } else if (event->key.keysym.sym == SDLK_q) {
         *running = false;
       }
+      /*
       printf("Other keycode; Physical %s key acting as %s key\n",
              SDL_GetScancodeName(event->key.keysym.scancode),
              SDL_GetKeyName(event->key.keysym.sym));
+      */
       HandleInput(event->key.keysym.sym, event->key.keysym.mod, true);
       break;
     case SDL_KEYUP:
@@ -74,14 +76,15 @@ void HandleEvent(SDL_Event* event, bool* running, bool* draw_rectangle) {
     }
 }
 
-int TryDrawRectangle() {
-  SDL_Rect sDim[1];
-  sDim[0].w = 200;
-  sDim[0].h = 200;
-  sDim[0].x = 640/2;
-  sDim[0].y = 480/2;
+void DefaultRect(SDL_Rect* rect) {
+  rect->w = 200;
+  rect->h = 200;
+  rect->x = 640/2;
+  rect->y = 480/2;
+}
 
-  if (SDL_FillRect(display, sDim, SDL_MapRGB(display->format, 0, 0, 255)) != 0) {
+int TryDrawRectangle(const SDL_Rect* rect) {
+  if (SDL_FillRect(display, rect, SDL_MapRGB(display->format, 0, 0, 255)) != 0) {
     printf("Failed to fill rectangle\n");
     return 1;
   }
@@ -115,7 +118,7 @@ int TryDrawTriangle() {
     printf("Failed to render triangle: %s\n", SDL_GetError());
     return 1;
   }
-  printf("Render triangle success\n");
+  // printf("Render triangle success\n");
   SDL_RenderPresent(renderer);
   return 0;
 }
@@ -125,7 +128,9 @@ int RenderEvent(bool draw_rectangle) {
   //    draw_rectangle ? "rectangle" : "triangle"));
   int result;
   if (draw_rectangle) {
-    result = TryDrawRectangle();
+    SDL_Rect rect;
+    DefaultRect(&rect);
+    result = TryDrawRectangle(&rect);
   } else {
     result = TryDrawTriangle();
   }
@@ -156,13 +161,30 @@ int main(int argc, char** argv) {
   bool running = true;
   bool draw_rectangle = false;
   while (running) {
+    // Every frame should poll until all events are handled.
     while (SDL_PollEvent(&event)) {
       HandleEvent(&event, &running, &draw_rectangle);
       if (RenderEvent(draw_rectangle) != 0) {
         return 1;
       }
-      SDL_Delay(30);
+      // const SDL_Rect rect = {SDL_Mouse.X,SDL_Mouse.Y-50,100,50};
+      // drawRectangle( renderer, rect, ARRAY_CONSINT{255,0,0,255}, 0);
+      int x,y;
+      if (SDL_GetMouseState(&x, &y)) {
+        SDL_Rect rect;
+        rect.w = 10;
+        rect.h = 10;
+        rect.x = x;
+        rect.y = y;
+        int result = TryDrawRectangle(&rect);
+        if (result != 0) {
+          return 1;
+        }
+      }
+
     }
+    int milliseconds = 10;
+    SDL_Delay(milliseconds);
   }
 
   // int milliseconds = 2000;
