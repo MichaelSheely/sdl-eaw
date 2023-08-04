@@ -4,14 +4,11 @@
 
 #define WINDOW_WIDTH   1280
 #define WINDOW_HEIGHT  720
-// https://www.youtube.com/watch?v=FxCC9Ces1Yg&list=PLSPw4ASQYyymu3PfG9gxywSPghnSMiOAW&index=1
-// https://www.parallelrealities.co.uk/tutorials/isometric/isometric1.php
-// https://wiki.libsdl.org/SDL2/Tutorials
-// https://lazyfoo.net/tutorials/SDL/51_SDL_and_modern_opengl/index.php OpenGL
 static const char kWindowTitle[] = "SDL Test";
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Surface* display;
+static SDL_Renderer* renderer;
 
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
@@ -84,25 +81,20 @@ void DefaultRect(SDL_Rect* rect) {
 }
 
 int TryDrawRectangle(const SDL_Rect* rect) {
-  if (SDL_FillRect(display, rect, SDL_MapRGB(display->format, 0, 0, 255)) != 0) {
-    printf("Failed to fill rectangle\n");
-    return 1;
-  }
+  return SDL_RenderFillRect(renderer, rect);
 
-  SDL_UpdateWindowSurface(g_window);
-  return 0;
+  // if (SDL_FillRect(display, rect, SDL_MapRGB(display->format, 0, 0, 255)) != 0) {
+  //   printf("Failed to fill rectangle\n");
+  //   return 1;
+  // }
+
+  // SDL_UpdateWindowSurface(g_window);
 }
 
 int TryDrawTriangle() {
-  SDL_Renderer* renderer = SDL_GetRenderer(g_window);
-
-  if (renderer == NULL) {
-    printf("Renderer creation failed: %s\n", SDL_GetError());
-    return 1;
-  };
-  SDL_Texture* texture = SDL_CreateTexture(
-      // renderer, SDL_PIXELFORMAT_RGB555, SDL_TEXTUREACCESS_STATIC, 3, 3);
-      renderer, SDL_PIXELFORMAT_ARGB4444, SDL_TEXTUREACCESS_STATIC, 3, 3);
+  // SDL_Texture* texture = SDL_CreateTexture(
+  //     // renderer, SDL_PIXELFORMAT_RGB555, SDL_TEXTUREACCESS_STATIC, 3, 3);
+  //     renderer, SDL_PIXELFORMAT_ARGB4444, SDL_TEXTUREACCESS_STATIC, 3, 3);
 
   SDL_Vertex vertices[3];
   vertices[0].position.x = 100;
@@ -112,18 +104,18 @@ int TryDrawTriangle() {
   vertices[2].position.x = 200;
   vertices[2].position.y = 90;
 
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-  SDL_RenderClear(renderer);
+  // SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+  // SDL_RenderClear(renderer);
   if (SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0) != 0) {
     printf("Failed to render triangle: %s\n", SDL_GetError());
     return 1;
   }
   // printf("Render triangle success\n");
-  SDL_RenderPresent(renderer);
+  // SDL_RenderPresent(renderer);
   return 0;
 }
 
-int RenderEvent(bool draw_rectangle) {
+int RenderRectangleOrTriangle(bool draw_rectangle) {
   // printf("Rendering a %s\n", (
   //    draw_rectangle ? "rectangle" : "triangle"));
   int result;
@@ -151,6 +143,12 @@ int main(int argc, char** argv) {
     fprintf(stderr, "SDL window failed to initialise: %s\n", SDL_GetError());
     return 1;
   }
+  // Create a gpu renderer associated with the given window.
+  renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+  if (renderer == NULL) {
+    fprintf(stderr, "Unable to create GPU renderer for the given window: %s\n", SDL_GetError());
+    return 1;
+  }
   display = SDL_GetWindowSurface(g_window);
   if (display == NULL) {
     fprintf(stderr, "Screen surface display could not be created: %s\n", SDL_GetError());
@@ -159,30 +157,39 @@ int main(int argc, char** argv) {
 
   SDL_Event event;
   bool running = true;
-  bool draw_rectangle = false;
+  bool draw_rectangle = true;
+
   while (running) {
+    // Clear any garbage which was pre-existing in the rendering flow.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
     // Every frame should poll until all events are handled.
     while (SDL_PollEvent(&event)) {
+      // Update whether or not we are still running and what to draw
+      // based on user input.
       HandleEvent(&event, &running, &draw_rectangle);
-      if (RenderEvent(draw_rectangle) != 0) {
-        return 1;
-      }
-      // const SDL_Rect rect = {SDL_Mouse.X,SDL_Mouse.Y-50,100,50};
-      // drawRectangle( renderer, rect, ARRAY_CONSINT{255,0,0,255}, 0);
-      int x,y;
-      if (SDL_GetMouseState(&x, &y)) {
-        SDL_Rect rect;
-        rect.w = 10;
-        rect.h = 10;
-        rect.x = x;
-        rect.y = y;
-        int result = TryDrawRectangle(&rect);
-        if (result != 0) {
-          return 1;
-        }
-      }
-
     }
+    if (RenderRectangleOrTriangle(draw_rectangle) != 0) {
+      return 1;
+    }
+
+    int x,y;
+    SDL_GetMouseState(&x, &y);
+    SDL_Rect rect;
+    rect.w = 10;
+    rect.h = 10;
+    rect.x = x - 10;
+    rect.y = y - 10;
+
+    int result = TryDrawRectangle(&rect);
+    if (result != 0) {
+      return 1;
+    }
+
+    // After all drawing has been completed, present rendering via GPU.
+    SDL_RenderPresent(renderer);
+
     int milliseconds = 10;
     SDL_Delay(milliseconds);
   }
