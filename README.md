@@ -9,5 +9,8 @@ Tested on Debian rodete.
 Can compile and run via the following commands:
 
 ```
-$ gcc -o eaw eaw.cc $(sdl2-config --cflags --libs) && ./eaw
+$ gcc -o eaw eaw.cc draw_circle.cc $(sdl2-config --cflags --libs) && ./eaw
 ```
+
+Some code for circle drawing in SDL2 cribbed from
+https://github.com/rtrussell/BBCSDL/blob/master/src/SDL2_gfxPrimitives.c

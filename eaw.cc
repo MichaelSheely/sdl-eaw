@@ -1,13 +1,13 @@
 #include <stdint.h>
 
 #include <SDL.h>
+#include "draw_circle.h"
 
 #define WINDOW_WIDTH   1280
 #define WINDOW_HEIGHT  720
 static const char kWindowTitle[] = "SDL Test";
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
-static SDL_Surface* display;
 static SDL_Renderer* renderer;
 
 // Returns if still running.
@@ -80,17 +80,6 @@ void DefaultRect(SDL_Rect* rect) {
   rect->y = 480/2;
 }
 
-int TryDrawRectangle(const SDL_Rect* rect) {
-  return SDL_RenderFillRect(renderer, rect);
-
-  // if (SDL_FillRect(display, rect, SDL_MapRGB(display->format, 0, 0, 255)) != 0) {
-  //   printf("Failed to fill rectangle\n");
-  //   return 1;
-  // }
-
-  // SDL_UpdateWindowSurface(g_window);
-}
-
 int TryDrawTriangle() {
   // SDL_Texture* texture = SDL_CreateTexture(
   //     // renderer, SDL_PIXELFORMAT_RGB555, SDL_TEXTUREACCESS_STATIC, 3, 3);
@@ -105,28 +94,28 @@ int TryDrawTriangle() {
   vertices[2].position.y = 90;
 
   // SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-  // SDL_RenderClear(renderer);
   if (SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0) != 0) {
     printf("Failed to render triangle: %s\n", SDL_GetError());
     return 1;
   }
-  // printf("Render triangle success\n");
-  // SDL_RenderPresent(renderer);
   return 0;
 }
 
 int RenderRectangleOrTriangle(bool draw_rectangle) {
-  // printf("Rendering a %s\n", (
-  //    draw_rectangle ? "rectangle" : "triangle"));
   int result;
   if (draw_rectangle) {
     SDL_Rect rect;
     DefaultRect(&rect);
-    result = TryDrawRectangle(&rect);
+    result = SDL_RenderFillRect(renderer, &rect);
   } else {
     result = TryDrawTriangle();
   }
   return result;
+}
+
+int RenderBlueCircle(
+    SDL_Renderer* renderer, int x, int y, int r) {
+  return ellipseRGBA(renderer, x, y, r, r, 0, 100, 0, 0);
 }
 
 int main(int argc, char** argv) {
@@ -149,16 +138,12 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Unable to create GPU renderer for the given window: %s\n", SDL_GetError());
     return 1;
   }
-  display = SDL_GetWindowSurface(g_window);
-  if (display == NULL) {
-    fprintf(stderr, "Screen surface display could not be created: %s\n", SDL_GetError());
-    return 1;
-  }
 
   SDL_Event event;
   bool running = true;
   bool draw_rectangle = true;
 
+  SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
   while (running) {
     // Clear any garbage which was pre-existing in the rendering flow.
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
@@ -182,8 +167,10 @@ int main(int argc, char** argv) {
     rect.x = x - 10;
     rect.y = y - 10;
 
-    int result = TryDrawRectangle(&rect);
-    if (result != 0) {
+    if (SDL_RenderFillRect(renderer, &rect) != 0) {
+      return 1;
+    }
+    if (RenderBlueCircle(renderer, x, y, 30) != 0) {
       return 1;
     }
 
@@ -193,15 +180,9 @@ int main(int argc, char** argv) {
     int milliseconds = 10;
     SDL_Delay(milliseconds);
   }
-
-  // int milliseconds = 2000;
-  // SDL_Delay(milliseconds);
-
   /* Frees memory */
   SDL_DestroyWindow(g_window);
-
   /* Shuts down all SDL subsystems */
   SDL_Quit();
-
   return 0;
 }
