@@ -1,14 +1,19 @@
 #include <stdint.h>
+#include <string>
 
 #include <SDL.h>
+#include <SDL_image.h>
 #include "draw_circle.h"
 
-#define WINDOW_WIDTH   1280
-#define WINDOW_HEIGHT  720
+// Can also use 1280x720.
+#define WINDOW_WIDTH   1920
+#define WINDOW_HEIGHT  1080
 static const char kWindowTitle[] = "SDL Test";
+// SDL_WINDOW_FULLSCREEN SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_MAXIMIZED
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Renderer* renderer;
+const char kGCMapFilename[] = "gc_map_placeholder.jpg";
 
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
@@ -93,6 +98,10 @@ int TryDrawTriangle() {
   vertices[2].position.x = 200;
   vertices[2].position.y = 90;
 
+  // For https://wiki.libsdl.org/SDL2/SDL_SetRenderDrawBlendMode,
+  // see https://en.wikipedia.org/wiki/Alpha_compositing
+  // and https://en.wikipedia.org/wiki/Blend_modes
+
   // SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
   if (SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0) != 0) {
     printf("Failed to render triangle: %s\n", SDL_GetError());
@@ -118,12 +127,22 @@ int RenderBlueCircle(
   return ellipseRGBA(renderer, x, y, r, r, 0, 100, 0, 0);
 }
 
-int main(int argc, char** argv) {
+int RenderGCBackground(const std::string& assets_directory) {
+  SDL_Texture* texture = NULL;
+  texture = IMG_LoadTexture(
+      renderer, (assets_directory + kGCMapFilename).c_str());
+  SDL_RenderCopy(renderer, texture, NULL, NULL);
+  return 0;
+}
+
+int launch_game(const std::string& assets_directory) {
   // set up SDL
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+  if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO) != 0) {
     printf("Failed to init SDL: %s\n", SDL_GetError());
     return 1;
   }
+  // Can also OR together IMG_INIT_PNG and IMG_INIT_TIF if needed.
+  IMG_Init(IMG_INIT_JPG);
 
   g_window = SDL_CreateWindow(
       kWindowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -149,12 +168,18 @@ int main(int argc, char** argv) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
+
     // Every frame should poll until all events are handled.
     while (SDL_PollEvent(&event)) {
       // Update whether or not we are still running and what to draw
       // based on user input.
       HandleEvent(&event, &running, &draw_rectangle);
     }
+
+    if (RenderGCBackground(assets_directory) != 0) {
+      return 1;
+    }
+
     if (RenderRectangleOrTriangle(draw_rectangle) != 0) {
       return 1;
     }
@@ -184,5 +209,22 @@ int main(int argc, char** argv) {
   SDL_DestroyWindow(g_window);
   /* Shuts down all SDL subsystems */
   SDL_Quit();
+  IMG_Quit();
+  return 0;
+}
+
+int main(int argc, char** argv) {
+  std::string assets_directory;
+  for (int i = 0; i < argc; ++i) {
+    std::string option = argv[i];
+    if (option.rfind("--assets=", 0) == 0) {
+      assets_directory = option.substr(9, option.length() - 9);
+    }
+  }
+  if (assets_directory.empty()) {
+    printf("Must provide the directory from which to load assets via `--assets=`.\n");
+    return 1;
+  }
+  launch_game(assets_directory);
   return 0;
 }
