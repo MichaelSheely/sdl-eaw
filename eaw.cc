@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 #include "draw_circle.h"
 
 // Can also use 1280x720.
@@ -14,6 +15,12 @@ static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Renderer* renderer;
 const char kGCMapFilename[] = "gc_map_placeholder.jpg";
+const char kAcclamatorFilename[] = "acclamator.png";
+
+struct LaunchFlags {
+  std::string assets_directory;
+  std::string typeface_path;
+};
 
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
@@ -85,9 +92,25 @@ void DefaultRect(SDL_Rect* rect) {
   rect->y = 480/2;
 }
 
-int TryDrawTriangle() {
+int DrawAcclamatorTriangle(const std::string& assets_directory) {
+  SDL_Vertex vertices[3];
+  vertices[0].position.x = 100;
+  vertices[0].position.y = 120;
+  vertices[1].position.x = 200;
+  vertices[1].position.y = 250;
+  vertices[2].position.x = 200;
+  vertices[2].position.y = 90;
+
+  SDL_Texture* texture = IMG_LoadTexture(
+      renderer, (assets_directory + kAcclamatorFilename).c_str());
+
+  // TODO: Use the acclamator texture
+  return SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0);
+}
+
+int DrawBasicTriangle() {
+  // Alternatively, could use SDL_PIXELFORMAT_RGB555.
   // SDL_Texture* texture = SDL_CreateTexture(
-  //     // renderer, SDL_PIXELFORMAT_RGB555, SDL_TEXTUREACCESS_STATIC, 3, 3);
   //     renderer, SDL_PIXELFORMAT_ARGB4444, SDL_TEXTUREACCESS_STATIC, 3, 3);
 
   SDL_Vertex vertices[3];
@@ -110,14 +133,18 @@ int TryDrawTriangle() {
   return 0;
 }
 
-int RenderRectangleOrTriangle(bool draw_rectangle) {
+// For true 3d rendering, see:
+// https://www.khronos.org/opengl/wiki/Tutorial3:_Rendering_3D_Objects_(C_/SDL)
+
+int RenderRectangleOrTriangle(
+    const std::string& assets_directory, bool draw_rectangle) {
   int result;
   if (draw_rectangle) {
     SDL_Rect rect;
     DefaultRect(&rect);
     result = SDL_RenderFillRect(renderer, &rect);
   } else {
-    result = TryDrawTriangle();
+    result = DrawAcclamatorTriangle(assets_directory);
   }
   return result;
 }
@@ -135,7 +162,28 @@ int RenderGCBackground(const std::string& assets_directory) {
   return 0;
 }
 
-int launch_game(const std::string& assets_directory) {
+// Cribbing from https://stackoverflow.com/a/38169008/6472082.
+void display_text(int x, int y, char* text, TTF_Font* font) {
+  int text_width;
+  int text_height;
+  SDL_Surface* surface;
+  SDL_Color textColor = {255, 255, 255, 0};
+
+  surface = TTF_RenderText_Solid(font, text, textColor);
+  SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+  text_width = surface->w;
+  text_height = surface->h;
+  SDL_FreeSurface(surface);
+  SDL_Rect rect;
+  rect.x = x;
+  rect.y = y;
+  rect.w = text_width;
+  rect.h = text_height;
+
+  SDL_RenderCopy(renderer, texture, NULL, &rect);
+}
+
+int launch_game(const LaunchFlags& launch_flags) {
   // set up SDL
   if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO) != 0) {
     printf("Failed to init SDL: %s\n", SDL_GetError());
@@ -143,6 +191,12 @@ int launch_game(const std::string& assets_directory) {
   }
   // Can also OR together IMG_INIT_PNG and IMG_INIT_TIF if needed.
   IMG_Init(IMG_INIT_JPG);
+  TTF_Init();
+  TTF_Font* font = TTF_OpenFont(launch_flags.typeface_path.c_str(), 12);
+  if (font == NULL) {
+    fprintf(stderr, "Failed to open droid sans font\n", SDL_GetError());
+    return 1;
+  }
 
   g_window = SDL_CreateWindow(
       kWindowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -165,7 +219,7 @@ int launch_game(const std::string& assets_directory) {
   SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
   while (running) {
     // Clear any garbage which was pre-existing in the rendering flow.
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
 
@@ -176,16 +230,22 @@ int launch_game(const std::string& assets_directory) {
       HandleEvent(&event, &running, &draw_rectangle);
     }
 
-    if (RenderGCBackground(assets_directory) != 0) {
+    if (RenderGCBackground(launch_flags.assets_directory) != 0) {
       return 1;
     }
 
-    if (RenderRectangleOrTriangle(draw_rectangle) != 0) {
+    if (RenderRectangleOrTriangle(
+        launch_flags.assets_directory, draw_rectangle) != 0) {
+      printf("Failed to render: %s\n", SDL_GetError());
       return 1;
     }
 
     int x,y;
     SDL_GetMouseState(&x, &y);
+    char mouse_position[30];
+    SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
+    sprintf(mouse_position, "(%d,%d)", x, y);
+    display_text(0, 0, mouse_position, font);
     SDL_Rect rect;
     rect.w = 10;
     rect.h = 10;
@@ -213,18 +273,38 @@ int launch_game(const std::string& assets_directory) {
   return 0;
 }
 
+// Attempts to extract the given flag from the element
+// of argv[] to flag_value.  If successful, returns true.
+bool attempt_flag_extraction(
+    const std::string& element_of_argv,
+    const std::string& desired_flag,
+    std::string* flag_value) {
+  size_t desired_flag_length = desired_flag.length();
+  if (element_of_argv.rfind(desired_flag, 0) == 0) {
+    *flag_value = element_of_argv.substr(
+        desired_flag_length, element_of_argv.length() - desired_flag_length);
+    return true;
+  }
+  return false;
+}
+
 int main(int argc, char** argv) {
-  std::string assets_directory;
+  LaunchFlags launch_flags;
   for (int i = 0; i < argc; ++i) {
     std::string option = argv[i];
-    if (option.rfind("--assets=", 0) == 0) {
-      assets_directory = option.substr(9, option.length() - 9);
-    }
+    attempt_flag_extraction(
+        option, "--assets=", &launch_flags.assets_directory);
+    attempt_flag_extraction(
+        option, "--typeface=", &launch_flags.typeface_path);
   }
-  if (assets_directory.empty()) {
+  if (launch_flags.assets_directory.empty()) {
     printf("Must provide the directory from which to load assets via `--assets=`.\n");
     return 1;
   }
-  launch_game(assets_directory);
+  if (launch_flags.typeface_path.empty()) {
+    printf("Must provide the path to the typeface to use via `--typeface=`.\n");
+    return 1;
+  }
+  launch_game(launch_flags);
   return 0;
 }
