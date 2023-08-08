@@ -100,8 +100,7 @@ int DrawAcclamatorTriangle(const std::string& assets_directory) {
   rect.x = 640/2;
   rect.y = 480/2;
 
-  SDL_RenderCopy(renderer, acc_texture, NULL, &rect);
-  return 0;
+  return SDL_RenderCopy(renderer, acc_texture, NULL, &rect);
 }
 
 int DrawBasicTriangle() {
@@ -154,8 +153,7 @@ int RenderGCBackground(const std::string& assets_directory) {
   SDL_Texture* texture = NULL;
   texture = IMG_LoadTexture(
       renderer, (assets_directory + kGCMapFilename).c_str());
-  SDL_RenderCopy(renderer, texture, NULL, NULL);
-  return 0;
+  return SDL_RenderCopy(renderer, texture, NULL, NULL);
 }
 
 // Cribbing from https://stackoverflow.com/a/38169008/6472082.
@@ -176,7 +174,9 @@ void display_text(int x, int y, char* text, TTF_Font* font) {
   rect.w = text_width;
   rect.h = text_height;
 
-  SDL_RenderCopy(renderer, texture, NULL, &rect);
+  if (SDL_RenderCopy(renderer, texture, NULL, &rect) != 0) {
+    printf("Failed to write text due to: %s\n", SDL_GetError());
+  }
 }
 
 int launch_game(const LaunchFlags& launch_flags) {
