@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -28,6 +29,37 @@ struct LaunchFlags {
   std::string typeface_path;
 };
 
+struct SpaceObject {
+  SDL_Point center_position;
+  std::string object_id;
+  std::string object_class;
+  std::string object_name;
+  SDL_Texture* texture;
+  int width;
+  int height;
+  bool selected = false;
+  void GetBoundingBox(SDL_Rect* rect) {
+    rect->x = center_position.x - (width / 2);
+    rect->y = center_position.y - (height / 2);
+    rect->w = width;
+    rect->h = height;
+  }
+  void Select() {
+    selected = true;
+    printf("Selected %s of class %s\n", object_name, object_class);
+  }
+};
+
+void MakeAcc(SpaceObject* acc) {
+  // TODO: Generate uuid.
+  acc->object_class = "acc";
+  acc->object_name = "valiant";
+  acc->width = 789 / 3;
+  acc->height = 400 / 3;
+  acc->center_position = { 400, 600 };
+  acc->texture = acc_texture;
+}
+
 struct GameState {
   enum class CommandMode {
     kSpaceTacticalView,
@@ -38,7 +70,13 @@ struct GameState {
   const LaunchFlags* launch_flags;
   CommandMode mode;
   bool running = true;
+  bool paused = false;
   bool spawn_acc = false;
+
+  struct SpaceTacticalState {
+    std::vector<SpaceObject> objects;
+  };
+  SpaceTacticalState tactical_state;
 };
 
 // Returns if still running.
@@ -85,6 +123,9 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
         gs->spawn_acc = false;
       } else if (event->key.keysym.sym == SDLK_t) {
         gs->spawn_acc = true;
+        SpaceObject acc;
+        MakeAcc(&acc);
+        gs->tactical_state.objects.push_back(acc);
       } else if (event->key.keysym.sym == SDLK_q) {
         gs->running = false;
       }
@@ -154,16 +195,13 @@ int DrawBasicTriangle() {
 
 // For true 3d rendering, see:
 // https://www.khronos.org/opengl/wiki/Tutorial3:_Rendering_3D_Objects_(C_/SDL)
-
-int RenderRectangleOrTriangle(
-    const std::string& assets_directory, bool spawn_acc) {
-  int result;
-  if (spawn_acc) {
-    result = DrawAcclamatorTriangle(assets_directory);
-  } else {
+int RenderUnits(GameState& gs) {
+  int result = 0;
+  for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
     SDL_Rect rect;
-    DefaultRect(&rect);
-    result = SDL_RenderFillRect(renderer, &rect);
+    gs.tactical_state.objects[i].GetBoundingBox(&rect);
+    result = SDL_RenderCopy(
+        renderer, gs.tactical_state.objects[i].texture, NULL, &rect);
   }
   return result;
 }
@@ -270,8 +308,7 @@ int Render(GameState& gs) {
     return 1;
   }
 
-  if (RenderRectangleOrTriangle(
-      gs.launch_flags->assets_directory, gs.spawn_acc) != 0) {
+  if (RenderUnits(gs) != 0) {
     printf("Failed to render: %s\n", SDL_GetError());
     return 1;
   }
