@@ -46,7 +46,7 @@ void HandleInput(int keyCode, int modCode, bool pressed) {
   return;
 }
 
-void HandleEvent(SDL_Event* event, bool* running, bool* spawn_acc) {
+void HandleEvent(SDL_Event* event, GameState* gs) {
   switch(event->type) {
     case SDL_CONTROLLERDEVICEADDED:
       // OpenOneGamepad(event->cdevice.which);
@@ -82,11 +82,17 @@ void HandleEvent(SDL_Event* event, bool* running, bool* spawn_acc) {
       break;
     case SDL_KEYDOWN:
       if (event->key.keysym.sym == SDLK_r ) {
-        *spawn_acc = false;
+        gs->spawn_acc = false;
       } else if (event->key.keysym.sym == SDLK_t) {
-        *spawn_acc = true;
+        gs->spawn_acc = true;
       } else if (event->key.keysym.sym == SDLK_q) {
-        *running = false;
+        gs->running = false;
+      }
+
+      if (event->key.keysym.sym == SDLK_g ) {
+        gs->mode = GameState::CommandMode::kGalacticOverivew;
+      } else if (event->key.keysym.sym == SDLK_s) {
+        gs->mode = GameState::CommandMode::kSpaceTacticalView;
       }
       /*
       printf("Other keycode; Physical %s key acting as %s key\n",
@@ -99,7 +105,7 @@ void HandleEvent(SDL_Event* event, bool* running, bool* spawn_acc) {
       HandleInput(event->key.keysym.sym, event->key.keysym.mod, false);
       break;
     case SDL_QUIT:
-      *running = false;
+      gs->running = false;
       break;
     }
 }
@@ -167,10 +173,19 @@ int RenderBlueCircle(
   return ellipseRGBA(renderer, x, y, r, r, 0, 100, 0, 0);
 }
 
-int RenderGCBackground(const std::string& assets_directory) {
+int RenderBackground(const std::string& assets_directory,
+                     GameState::CommandMode mode) {
   SDL_Texture* texture = NULL;
+  std::string bg_filename;
+  switch (mode) {
+    case GameState::CommandMode::kSpaceTacticalView:
+      bg_filename = kPleiadesFilename;
+      break;
+    default:
+      bg_filename = kGCMapFilename;
+  }
   texture = IMG_LoadTexture(
-      renderer, (assets_directory + kGCMapFilename).c_str());
+      renderer, (assets_directory + bg_filename).c_str());
   return SDL_RenderCopy(renderer, texture, NULL, NULL);
 }
 
@@ -237,7 +252,8 @@ int GameLoop(GameState& gs) {
   while (SDL_PollEvent(&event)) {
     // Update whether or not we are still running and what to draw
     // based on user input.
-    HandleEvent(&event, &gs.running, &gs.spawn_acc);
+    // HandleEvent(&event, &gs.running, &gs.spawn_acc);
+    HandleEvent(&event, &gs);
   }
   return 0;
 }
@@ -250,7 +266,7 @@ int Render(GameState& gs) {
 
   SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
 
-  if (RenderGCBackground(gs.launch_flags->assets_directory) != 0) {
+  if (RenderBackground(gs.launch_flags->assets_directory, gs.mode) != 0) {
     return 1;
   }
 
