@@ -15,7 +15,12 @@ static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Renderer* renderer;
 static SDL_Texture* acc_texture;
+static TTF_Font* font;
+// 1266x768. Replace with a better galaxy map.
 const char kGCMapFilename[] = "gc_map_placeholder.jpg";
+// 1024x738.  Background for space scenes.
+const char kPleiadesFilename[] = "pleiades_1024x738.jpg";
+// 789x400 from https://www.swcombine.com/rules/?Capital_Ships&ID=91
 const char kAcclamatorFilename[] = "acclamator.png";
 
 struct LaunchFlags {
@@ -23,12 +28,25 @@ struct LaunchFlags {
   std::string typeface_path;
 };
 
+struct GameState {
+  enum class CommandMode {
+    kSpaceTacticalView,
+    kGalacticOverivew,
+    kPlanetView,
+    // TODO: Add planetary base details.
+  };
+  const LaunchFlags* launch_flags;
+  CommandMode mode;
+  bool running = true;
+  bool spawn_acc = false;
+};
+
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
   return;
 }
 
-void HandleEvent(SDL_Event* event, bool* running, bool* draw_rectangle) {
+void HandleEvent(SDL_Event* event, bool* running, bool* spawn_acc) {
   switch(event->type) {
     case SDL_CONTROLLERDEVICEADDED:
       // OpenOneGamepad(event->cdevice.which);
@@ -64,9 +82,9 @@ void HandleEvent(SDL_Event* event, bool* running, bool* draw_rectangle) {
       break;
     case SDL_KEYDOWN:
       if (event->key.keysym.sym == SDLK_r ) {
-        *draw_rectangle = true;
+        *spawn_acc = false;
       } else if (event->key.keysym.sym == SDLK_t) {
-        *draw_rectangle = false;
+        *spawn_acc = true;
       } else if (event->key.keysym.sym == SDLK_q) {
         *running = false;
       }
@@ -132,14 +150,14 @@ int DrawBasicTriangle() {
 // https://www.khronos.org/opengl/wiki/Tutorial3:_Rendering_3D_Objects_(C_/SDL)
 
 int RenderRectangleOrTriangle(
-    const std::string& assets_directory, bool draw_rectangle) {
+    const std::string& assets_directory, bool spawn_acc) {
   int result;
-  if (draw_rectangle) {
+  if (spawn_acc) {
+    result = DrawAcclamatorTriangle(assets_directory);
+  } else {
     SDL_Rect rect;
     DefaultRect(&rect);
     result = SDL_RenderFillRect(renderer, &rect);
-  } else {
-    result = DrawAcclamatorTriangle(assets_directory);
   }
   return result;
 }
@@ -179,7 +197,7 @@ void display_text(int x, int y, char* text, TTF_Font* font) {
   }
 }
 
-int launch_game(const LaunchFlags& launch_flags) {
+int PerformInitialization(const GameState& gs) {
   // set up SDL
   if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO) != 0) {
     printf("Failed to init SDL: %s\n", SDL_GetError());
@@ -188,7 +206,7 @@ int launch_game(const LaunchFlags& launch_flags) {
   // Can also OR together IMG_INIT_PNG and IMG_INIT_TIF if needed.
   IMG_Init(IMG_INIT_JPG);
   TTF_Init();
-  TTF_Font* font = TTF_OpenFont(launch_flags.typeface_path.c_str(), 12);
+  font = TTF_OpenFont(gs.launch_flags->typeface_path.c_str(), 12);
   if (font == NULL) {
     fprintf(stderr, "Failed to open droid sans font\n", SDL_GetError());
     return 1;
@@ -209,58 +227,78 @@ int launch_game(const LaunchFlags& launch_flags) {
   }
 
   acc_texture = IMG_LoadTexture(
-      renderer, (launch_flags.assets_directory + kAcclamatorFilename).c_str());
+      renderer, (gs.launch_flags->assets_directory + kAcclamatorFilename).c_str());
+  return 0;
+}
 
+int GameLoop(GameState& gs) {
   SDL_Event event;
-  bool running = true;
-  bool draw_rectangle = true;
+  // Every frame should poll until all events are handled.
+  while (SDL_PollEvent(&event)) {
+    // Update whether or not we are still running and what to draw
+    // based on user input.
+    HandleEvent(&event, &gs.running, &gs.spawn_acc);
+  }
+  return 0;
+}
+
+int Render(GameState& gs) {
+  // Clear any garbage which was pre-existing in the rendering flow.
+  SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
+  SDL_RenderClear(renderer);
+  SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
 
   SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
-  while (running) {
-    // Clear any garbage which was pre-existing in the rendering flow.
-    SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
-    SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
 
-    // Every frame should poll until all events are handled.
-    while (SDL_PollEvent(&event)) {
-      // Update whether or not we are still running and what to draw
-      // based on user input.
-      HandleEvent(&event, &running, &draw_rectangle);
-    }
+  if (RenderGCBackground(gs.launch_flags->assets_directory) != 0) {
+    return 1;
+  }
 
-    if (RenderGCBackground(launch_flags.assets_directory) != 0) {
-      return 1;
-    }
+  if (RenderRectangleOrTriangle(
+      gs.launch_flags->assets_directory, gs.spawn_acc) != 0) {
+    printf("Failed to render: %s\n", SDL_GetError());
+    return 1;
+  }
 
-    if (RenderRectangleOrTriangle(
-        launch_flags.assets_directory, draw_rectangle) != 0) {
-      printf("Failed to render: %s\n", SDL_GetError());
-      return 1;
-    }
+  int x,y;
+  SDL_GetMouseState(&x, &y);
+  char mouse_position[30];
+  SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
+  sprintf(mouse_position, "(%d,%d)", x, y);
+  display_text(0, 0, mouse_position, font);
+  SDL_Rect rect;
+  rect.w = 10;
+  rect.h = 10;
+  rect.x = x - 10;
+  rect.y = y - 10;
 
-    int x,y;
-    SDL_GetMouseState(&x, &y);
-    char mouse_position[30];
-    SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
-    sprintf(mouse_position, "(%d,%d)", x, y);
-    display_text(0, 0, mouse_position, font);
-    SDL_Rect rect;
-    rect.w = 10;
-    rect.h = 10;
-    rect.x = x - 10;
-    rect.y = y - 10;
+  if (SDL_RenderFillRect(renderer, &rect) != 0) {
+    return 1;
+  }
+  if (RenderBlueCircle(renderer, x, y, 30) != 0) {
+    return 1;
+  }
 
-    if (SDL_RenderFillRect(renderer, &rect) != 0) {
-      return 1;
-    }
-    if (RenderBlueCircle(renderer, x, y, 30) != 0) {
-      return 1;
-    }
+  // After all drawing has been completed, present rendering via GPU.
+  SDL_RenderPresent(renderer);
 
-    // After all drawing has been completed, present rendering via GPU.
-    SDL_RenderPresent(renderer);
+  return 0;
+}
 
+int launch_game(const LaunchFlags& launch_flags) {
+  GameState gs;
+  gs.mode = GameState::CommandMode::kGalacticOverivew;
+  gs.launch_flags = &launch_flags;
+  gs.running = true;
+  gs.spawn_acc = false;
+
+  if (PerformInitialization(gs) != 0) {
+    return 1;
+  }
+
+  while (gs.running) {
+    GameLoop(gs);
+    Render(gs);
     int milliseconds = 10;
     SDL_Delay(milliseconds);
   }
