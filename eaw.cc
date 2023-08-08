@@ -14,6 +14,7 @@ static const char kWindowTitle[] = "SDL Test";
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Renderer* renderer;
+static SDL_Texture* acc_texture;
 const char kGCMapFilename[] = "gc_map_placeholder.jpg";
 const char kAcclamatorFilename[] = "acclamator.png";
 
@@ -93,19 +94,14 @@ void DefaultRect(SDL_Rect* rect) {
 }
 
 int DrawAcclamatorTriangle(const std::string& assets_directory) {
-  SDL_Vertex vertices[3];
-  vertices[0].position.x = 100;
-  vertices[0].position.y = 120;
-  vertices[1].position.x = 200;
-  vertices[1].position.y = 250;
-  vertices[2].position.x = 200;
-  vertices[2].position.y = 90;
+  SDL_Rect rect;
+  rect.w = 789 / 2;
+  rect.h = 400 / 2;
+  rect.x = 640/2;
+  rect.y = 480/2;
 
-  SDL_Texture* texture = IMG_LoadTexture(
-      renderer, (assets_directory + kAcclamatorFilename).c_str());
-
-  // TODO: Use the acclamator texture
-  return SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0);
+  SDL_RenderCopy(renderer, acc_texture, NULL, &rect);
+  return 0;
 }
 
 int DrawBasicTriangle() {
@@ -211,6 +207,9 @@ int launch_game(const LaunchFlags& launch_flags) {
     fprintf(stderr, "Unable to create GPU renderer for the given window: %s\n", SDL_GetError());
     return 1;
   }
+
+  acc_texture = IMG_LoadTexture(
+      renderer, (launch_flags.assets_directory + kAcclamatorFilename).c_str());
 
   SDL_Event event;
   bool running = true;
