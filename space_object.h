@@ -9,8 +9,6 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 
-#include "game_state.h"
-
 #define PI 3.14159265
 
 // Specifies the layer in which the draw elements.
