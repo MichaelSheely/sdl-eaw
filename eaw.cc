@@ -235,7 +235,8 @@ int RenderUnits(GameState& gs) {
     result = SDL_RenderCopy(
         renderer, gs.tactical_state.objects[i].texture, NULL, &bb);
     if (gs.tactical_state.objects[i].selected) {
-      RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2, bb.w, bb.h);
+      RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2,
+                        0.7 * bb.w, 0.7 * bb.h);
     }
   }
   return result;
