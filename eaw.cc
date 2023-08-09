@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -6,10 +7,14 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include "draw_circle.h"
+#include "launch_flags.h"
+#include "game_state.h"
+#include "space_object.h"
 
 // Can also use 1280x720.
 #define WINDOW_WIDTH   1920
 #define WINDOW_HEIGHT  1080
+#define PI 3.14159265
 static const char kWindowTitle[] = "SDL Test";
 // SDL_WINDOW_FULLSCREEN SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_MAXIMIZED
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
@@ -24,64 +29,60 @@ const char kPleiadesFilename[] = "pleiades_1024x738.jpg";
 // 789x400 from https://www.swcombine.com/rules/?Capital_Ships&ID=91
 const char kAcclamatorFilename[] = "acclamator.png";
 
-struct LaunchFlags {
-  std::string assets_directory;
-  std::string typeface_path;
-};
-
-struct SpaceObject {
-  SDL_Point center_position;
-  std::string object_id;
-  std::string object_class;
-  std::string object_name;
-  SDL_Texture* texture;
-  int width;
-  int height;
-  bool selected = false;
-  void GetBoundingBox(SDL_Rect* rect) {
-    rect->x = center_position.x - (width / 2);
-    rect->y = center_position.y - (height / 2);
-    rect->w = width;
-    rect->h = height;
-  }
-  void Select() {
-    selected = true;
-    printf("Selected %s of class %s\n", object_name, object_class);
-  }
-};
-
 void MakeAcc(SpaceObject* acc) {
-  // TODO: Generate uuid.
+  // TODO: Generate real uuid.
+  acc->object_id = "0x0001";
   acc->object_class = "acc";
   acc->object_name = "valiant";
   acc->width = 789 / 3;
   acc->height = 400 / 3;
   acc->center_position = { 400, 600 };
   acc->texture = acc_texture;
+  acc->layer = kFrigateCruiserLayer;
+  // Based on image texture, computed the approximate
+  // heading of the initial image.
+  acc->heading = -2.68;
+  acc->acceleration = 0.1;
+  acc->rotational_acceleration = 0.1;
+  acc->max_speed = 0.5;
 }
-
-struct GameState {
-  enum class CommandMode {
-    kSpaceTacticalView,
-    kGalacticOverivew,
-    kPlanetView,
-    // TODO: Add planetary base details.
-  };
-  const LaunchFlags* launch_flags;
-  CommandMode mode;
-  bool running = true;
-  bool paused = false;
-  bool spawn_acc = false;
-
-  struct SpaceTacticalState {
-    std::vector<SpaceObject> objects;
-  };
-  SpaceTacticalState tactical_state;
-};
 
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
   return;
+}
+
+void SetDestinationForAllSelectedUnits(GameState* gs, int x, int y) {
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    SpaceObject& obj = gs->tactical_state.objects[i];
+    if (obj.selected) {
+      SDL_Point destination;
+      destination.x = x;
+      destination.y = y;
+      obj.waypoints.push_back(destination);
+    }
+  }
+}
+
+// Returns whether or not there was a unit under the cursor.
+bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y) {
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    SpaceObject& obj = gs->tactical_state.objects[i];
+    SDL_Rect bb;
+    obj.GetBoundingBox(&bb);
+    if ((bb.x < x && x < bb.x + bb.w) &&
+        (bb.y < y && y < bb.y + bb.h)) {
+      obj.Select();
+      return true;
+    }
+  }
+  return false;
+}
+
+void DeselectAllUnits(GameState* gs) {
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    gs->tactical_state.objects[i].Deselect();
+  }
 }
 
 void HandleEvent(SDL_Event* event, GameState* gs) {
@@ -106,6 +107,24 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
       }
       break;
     case SDL_MOUSEBUTTONDOWN:
+      if (event->button.button == SDL_BUTTON_LEFT &&
+          event->button.state == SDL_PRESSED) {
+        if (gs->mode == GameState::CommandMode::kGalacticOverivew) {
+          // Handle appropriately.
+        } else if (gs->mode == GameState::CommandMode::kSpaceTacticalView) {
+          if (!MarkUnitUnderCursorSelected(gs, event->button.x, event->button.y)) {
+            DeselectAllUnits(gs);
+          }
+        }
+      }
+      if (event->button.button == SDL_BUTTON_RIGHT &&
+          event->button.state == SDL_PRESSED) {
+        if (gs->mode == GameState::CommandMode::kGalacticOverivew) {
+          // Handle appropriately.
+        } else if (gs->mode == GameState::CommandMode::kSpaceTacticalView) {
+          SetDestinationForAllSelectedUnits(gs, event->button.x, event->button.y);
+        }
+      }
       // if (event->button.button == SDL_BUTTON_LEFT &&
       //     event->button.state == SDL_PRESSED &&
       //     event->button.clicks == 2) {
@@ -193,22 +212,33 @@ int DrawBasicTriangle() {
   return 0;
 }
 
+int RenderBlueEllipse(int x, int y, int rx, int ry) {
+  return ellipseRGBA(renderer, x, y, rx, ry, 0, 100, 0, 0);
+}
+
 // For true 3d rendering, see:
 // https://www.khronos.org/opengl/wiki/Tutorial3:_Rendering_3D_Objects_(C_/SDL)
 int RenderUnits(GameState& gs) {
   int result = 0;
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
-    SDL_Rect rect;
-    gs.tactical_state.objects[i].GetBoundingBox(&rect);
+    SDL_Rect bb;
+    gs.tactical_state.objects[i].GetBoundingBox(&bb);
+    /* TODO: Make use of heading via:
+     * int SDL_RenderCopyEx(SDL_Renderer * renderer,
+                   SDL_Texture * texture,
+                   const SDL_Rect * srcrect,
+                   const SDL_Rect * dstrect,
+                   const double angle,
+                   const SDL_Point *center,
+                   const SDL_RendererFlip flip);
+    */
     result = SDL_RenderCopy(
-        renderer, gs.tactical_state.objects[i].texture, NULL, &rect);
+        renderer, gs.tactical_state.objects[i].texture, NULL, &bb);
+    if (gs.tactical_state.objects[i].selected) {
+      RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2, bb.w, bb.h);
+    }
   }
   return result;
-}
-
-int RenderBlueCircle(
-    SDL_Renderer* renderer, int x, int y, int r) {
-  return ellipseRGBA(renderer, x, y, r, r, 0, 100, 0, 0);
 }
 
 int RenderBackground(const std::string& assets_directory,
@@ -228,7 +258,7 @@ int RenderBackground(const std::string& assets_directory,
 }
 
 // Cribbing from https://stackoverflow.com/a/38169008/6472082.
-void display_text(int x, int y, char* text, TTF_Font* font) {
+void display_text(int x, int y, const char* text, TTF_Font* font) {
   int text_width;
   int text_height;
   SDL_Surface* surface;
@@ -293,6 +323,15 @@ int GameLoop(GameState& gs) {
     // HandleEvent(&event, &gs.running, &gs.spawn_acc);
     HandleEvent(&event, &gs);
   }
+  for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
+    std::string log_data =
+        gs.tactical_state.objects[i].UpdateLocationAndVelocity();
+    if (gs.messages_to_display.size() < 1) {
+      gs.messages_to_display.push_back(log_data);
+    } else {
+      gs.messages_to_display[0] = log_data;
+    }
+  }
   return 0;
 }
 
@@ -319,18 +358,26 @@ int Render(GameState& gs) {
   SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
   sprintf(mouse_position, "(%d,%d)", x, y);
   display_text(0, 0, mouse_position, font);
-  SDL_Rect rect;
-  rect.w = 10;
-  rect.h = 10;
-  rect.x = x - 10;
-  rect.y = y - 10;
 
-  if (SDL_RenderFillRect(renderer, &rect) != 0) {
-    return 1;
+  for (int i = 0; i < gs.messages_to_display.size(); ++i) {
+    if (!gs.messages_to_display[i].empty()) {
+      display_text(0, i * 20 + 20, gs.messages_to_display[i].c_str(), font);
+    }
   }
-  if (RenderBlueCircle(renderer, x, y, 30) != 0) {
-    return 1;
-  }
+
+  // Draw a small rectangle at the point of the cursor.
+  // SDL_Rect rect;
+  // rect.w = 10;
+  // rect.h = 10;
+  // rect.x = x - 10;
+  // rect.y = y - 10;
+  // if (SDL_RenderFillRect(renderer, &rect) != 0) {
+  //   return 1;
+  // }
+  // Draw a circle around the cursor.
+  // if (RenderBlueCircle(renderer, x, y, 30) != 0) {
+  //   return 1;
+  // }
 
   // After all drawing has been completed, present rendering via GPU.
   SDL_RenderPresent(renderer);
