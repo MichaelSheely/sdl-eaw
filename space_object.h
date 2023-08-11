@@ -10,6 +10,7 @@
 #include <SDL_ttf.h>
 
 #define PI 3.14159265
+#define FLOAT_COMPARATOR 0.2
 
 // Specifies the layer in which the draw elements.
 enum Layer {
@@ -39,6 +40,30 @@ enum Layer {
 // Special case vader, he must be available before
 // the Executor can be built.
 
+float Distance(SDL_Point p1, SDL_Point p2) {
+  float dx = static_cast<float>(p1.x - p2.x);
+  float dy = static_cast<float>(p1.y - p2.y);
+  return sqrt(dx * dx + dy * dy);
+}
+
+// Negative value indicates radian1 should move clockwise
+// to most quickly reach radian2.
+float AngleBetween(float radian1, float radian2) {
+  if (radian1 < -PI || radian1 > PI || radian2 < -PI || radian2 > PI) {
+    printf("WARNING: %.2f or %.2f is out of bounds.\n", radian1, radian2);
+    return 0.0;
+  }
+  // Neet to consider both to determine which is the smaller angle
+  // due to the modulus at +/- PI.
+  float angle_displacement1 = radian1 - radian2;
+  float angle_displacement2 = radian2 - radian1;
+  if (std::abs(angle_displacement1) < std::abs(angle_displacement2)) {
+    return angle_displacement1;
+  } else {
+    return angle_displacement2;
+  }
+}
+
 struct SpaceObject {
   SDL_Point center_position;
   std::string object_id;
@@ -50,6 +75,7 @@ struct SpaceObject {
   Layer layer;
   // In radians, from -pi to pi.
   float heading;
+  float draw_rotation;
   float acceleration;
   float rotational_acceleration;
   float max_speed;
@@ -69,14 +95,34 @@ struct SpaceObject {
   void Deselect() {
     selected = false;
   }
-  std::string UpdateLocationAndVelocity() {
+  // Returns log messages.
+  std::vector<std::string> UpdateLocationAndVelocity() {
+    std::vector<std::string> log_messages;
     if (waypoints.empty()) {
-      if (speed > 0.01) {
+      if (speed > FLOAT_COMPARATOR) {
         speed = speed - acceleration;
       } else {
         speed = 0.0;
       }
-      return "test";
+      char buffer[100];
+      int size = sprintf(buffer, "No destination, speed is %.2f", speed);
+      std::string speed_log = std::string(buffer);
+      speed_log.resize(size);
+      log_messages.push_back(speed_log);
+      return log_messages;
+    } else {
+      if (Distance(waypoints[waypoints.size() - 1], center_position) < FLOAT_COMPARATOR) {
+        waypoints.pop_back();
+        printf("Made it to destination, removing waypoint. Remaining waypoints %d\n",
+               waypoints.size());
+      }
+      char buffer[100];
+      int size = sprintf(
+          buffer, "Distance to waypoint is still %.2f",
+          Distance(waypoints[waypoints.size() - 1], center_position));
+      std::string distance_remaining = std::string(buffer);
+      distance_remaining.resize(size);
+      log_messages.push_back(distance_remaining);
     }
 
     SDL_Point goal = waypoints[waypoints.size() - 1];
@@ -87,15 +133,74 @@ struct SpaceObject {
     // domain / range of builtin atan, may need to adjust
     // for quadrants.
     float desired_radians = static_cast<float>(
-        atan(static_cast<double>(delta_x) / delta_y));
+        // Negate y value because we draw with an inverted y axis.
+        atan2(static_cast<double>(-delta_y), static_cast<double>(delta_x)));
+
     char buffer[100];
     int size = sprintf(
         buffer, "Desired heading %.2f radians (%.2f degrees)",
         desired_radians, (desired_radians * 180 ) / PI);
     std::string heading_log = std::string(buffer);
-    // Trim extra chars.
     heading_log.resize(size);
-    return heading_log;
+    log_messages.push_back(heading_log);
+    size = sprintf(
+        buffer, "Current heading %.2f radians (%.2f degrees)",
+        heading, (heading * 180 ) / PI);
+    // Trim extra chars.
+    heading_log = std::string(buffer);
+    heading_log.resize(size);
+    log_messages.push_back(heading_log);
+
+    // Heading is close enough to start accelerating.
+    float angle = AngleBetween(heading, desired_radians);
+    printf("delta_x: %d, delta_y: %d, heading: %.2f, desired_radians %.2f, angle %.2f\n",
+           delta_x, delta_y, heading, desired_radians, angle);
+    // printf("Computed angle as %.2f\n", angle);
+    if (((angle * 180) / PI) < 0.1) {
+      heading = desired_radians;
+
+      speed += acceleration;
+      speed = std::min(speed, max_speed);
+
+      center_position.x += speed * cos(heading);
+      // Reverse the y of motion for drawing.
+      center_position.y -= speed * sin(heading);
+
+      char buffer[100];
+      int size = sprintf(
+          buffer, "Heading diff was %.2f which was less than %.2f)",
+          angle, FLOAT_COMPARATOR);
+      std::string heading_diff_log = std::string(buffer);
+      heading_diff_log.resize(size);
+      log_messages.push_back(heading_diff_log);
+    } else {
+      // Otherwise, turn as we decelerate(?).
+      float before_rotation_heading = heading;
+      heading += rotational_acceleration * (angle < 0 ? -1 : 1);
+      // printf("Rotated from %.2f to %.2f\n", before_rotation_heading, heading);
+      if (heading > PI) {
+        float old_heading = heading;
+        heading -= 2 * PI;
+        // printf("Heading %.2f > PI, updating to %.2f\n",
+        //        (old_heading * 180) / PI,
+        //        (heading * 180) / PI);
+      }
+      if (heading <= -PI) {
+        float old_heading = heading;
+        heading += 2 * PI;
+        // printf("Heading %.2f < -PI, updating to %.2f\n",
+        //        (old_heading * 180) / PI,
+        //        (heading * 180) / PI);
+      }
+      char buffer[100];
+      int size = sprintf(
+          buffer, "Heading was not close enough (%.2f vs %.2f), need to keep turning.",
+          std::abs(desired_radians - heading), FLOAT_COMPARATOR);
+      std::string heading_diff_log = std::string(buffer);
+      heading_diff_log.resize(size);
+      log_messages.push_back(heading_diff_log);
+    }
+    return log_messages;
   }
 };
 
