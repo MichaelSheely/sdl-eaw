@@ -242,7 +242,7 @@ int RenderUnits(GameState& gs) {
     result = SDL_RenderCopyEx(
         renderer, obj.texture,
         NULL /*copy entire texture*/, &bb,
-        ((obj.heading - obj.draw_rotation) * 180) / PI,
+        ((obj.draw_rotation - obj.heading) * 180) / PI,
         NULL /*rotate around center */, SDL_FLIP_NONE);
     // Annotate the heading of the unit.
     SDL_RenderDrawLine(renderer, obj.center_position.x, obj.center_position.y,
