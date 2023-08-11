@@ -156,7 +156,7 @@ struct SpaceObject {
     printf("delta_x: %d, delta_y: %d, heading: %.2f, desired_radians %.2f, angle %.2f\n",
            delta_x, delta_y, heading, desired_radians, angle);
     // printf("Computed angle as %.2f\n", angle);
-    if (((angle * 180) / PI) < 0.1) {
+    if (std::abs(angle) < 0.01) {
       heading = desired_radians;
 
       speed += acceleration;
