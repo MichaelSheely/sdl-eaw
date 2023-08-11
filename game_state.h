@@ -1,5 +1,6 @@
 #ifndef SDL_EAW_GAME_STATE_H_
 #define SDL_EAW_GAME_STATE_H_
+#include <chrono>
 #include <string>
 #include "space_object.h"
 
@@ -15,6 +16,9 @@ struct GameState {
   bool running = true;
   bool paused = false;
   bool spawn_acc = false;
+
+  std::chrono::microseconds last_frame;
+  std::chrono::microseconds last_frame_render;
 
   std::vector<std::string> messages_to_display;
 

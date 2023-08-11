@@ -1,3 +1,4 @@
+#include <chrono>
 #include <math.h>
 #include <stdint.h>
 #include <string>
@@ -14,6 +15,7 @@
 // Can also use 1280x720.
 #define WINDOW_WIDTH   1920
 #define WINDOW_HEIGHT  1080
+#define FRAMES_PER_SECOND 5
 #define PI 3.14159265
 static const char kWindowTitle[] = "SDL Test";
 // SDL_WINDOW_FULLSCREEN SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_MAXIMIZED
@@ -41,15 +43,24 @@ void MakeAcc(SpaceObject* acc) {
   acc->layer = kFrigateCruiserLayer;
   // Based on image texture, computed the approximate
   // heading of the initial image.
-  acc->heading = -2.68;
-  acc->acceleration = 0.1;
-  acc->rotational_acceleration = 0.1;
-  acc->max_speed = 0.5;
+  acc->heading = -2.72;
+  acc->draw_rotation = -2.72;
+  acc->acceleration = 0.5;
+  acc->rotational_acceleration = 0.01;
+  acc->max_speed = 15;
 }
 
 // Returns if still running.
 void HandleInput(int keyCode, int modCode, bool pressed) {
   return;
+}
+
+void ClearWaypointsForSelected(GameState* gs) {
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    if (gs->tactical_state.objects[i].selected) {
+      gs->tactical_state.objects[i].waypoints.clear();
+    }
+  }
 }
 
 void SetDestinationForAllSelectedUnits(GameState* gs, int x, int y) {
@@ -59,7 +70,12 @@ void SetDestinationForAllSelectedUnits(GameState* gs, int x, int y) {
       SDL_Point destination;
       destination.x = x;
       destination.y = y;
+      if (!obj.waypoints.empty()) {
+        obj.waypoints.clear();
+      }
       obj.waypoints.push_back(destination);
+      printf("Set (%d,%d) as destination for object at (%d,%d)\n",
+             x, y, obj.center_position.x, obj.center_position.y);
     }
   }
 }
@@ -138,10 +154,9 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
       // }
       break;
     case SDL_KEYDOWN:
-      if (event->key.keysym.sym == SDLK_r ) {
-        gs->spawn_acc = false;
+      if (event->key.keysym.sym == SDLK_x ) {
+        ClearWaypointsForSelected(gs);
       } else if (event->key.keysym.sym == SDLK_t) {
-        gs->spawn_acc = true;
         SpaceObject acc;
         MakeAcc(&acc);
         gs->tactical_state.objects.push_back(acc);
@@ -222,18 +237,23 @@ int RenderUnits(GameState& gs) {
   int result = 0;
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
     SDL_Rect bb;
-    gs.tactical_state.objects[i].GetBoundingBox(&bb);
-    /* TODO: Make use of heading via:
-     * int SDL_RenderCopyEx(SDL_Renderer * renderer,
-                   SDL_Texture * texture,
-                   const SDL_Rect * srcrect,
-                   const SDL_Rect * dstrect,
-                   const double angle,
-                   const SDL_Point *center,
-                   const SDL_RendererFlip flip);
-    */
-    result = SDL_RenderCopy(
-        renderer, gs.tactical_state.objects[i].texture, NULL, &bb);
+    SpaceObject& obj = gs.tactical_state.objects[i];
+    obj.GetBoundingBox(&bb);
+    result = SDL_RenderCopyEx(
+        renderer, obj.texture,
+        NULL /*copy entire texture*/, &bb,
+        ((obj.heading - obj.draw_rotation) * 180) / PI,
+        NULL /*rotate around center */, SDL_FLIP_NONE);
+    // Annotate the heading of the unit.
+    SDL_RenderDrawLine(renderer, obj.center_position.x, obj.center_position.y,
+                       obj.center_position.x + 150 * cos(obj.heading),
+                       obj.center_position.y - 150 * sin(obj.heading));
+    // printf("Heading: %.2f Draw Rotation: %.2f Final: %.2f\n",
+    //        (obj.heading * 180) / PI,
+    //        (obj.draw_rotation * 180) / PI,
+    //        ((obj.heading - obj.draw_rotation) * 180) / PI);
+    // result = SDL_RenderCopy(
+    //     renderer, gs.tactical_state.objects[i].texture, NULL, &bb);
     if (gs.tactical_state.objects[i].selected) {
       RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2,
                         0.7 * bb.w, 0.7 * bb.h);
@@ -325,13 +345,8 @@ int GameLoop(GameState& gs) {
     HandleEvent(&event, &gs);
   }
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
-    std::string log_data =
+    gs.messages_to_display =
         gs.tactical_state.objects[i].UpdateLocationAndVelocity();
-    if (gs.messages_to_display.size() < 1) {
-      gs.messages_to_display.push_back(log_data);
-    } else {
-      gs.messages_to_display[0] = log_data;
-    }
   }
   return 0;
 }
@@ -353,16 +368,22 @@ int Render(GameState& gs) {
     return 1;
   }
 
+  SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
+
+  char render_time[50];
+  sprintf(render_time, "Last frame micros: %d (rendering: %d)",
+          gs.last_frame.count(), gs.last_frame_render.count());
+  display_text(0, 0, render_time, font);
+
   int x,y;
   SDL_GetMouseState(&x, &y);
   char mouse_position[30];
-  SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
-  sprintf(mouse_position, "(%d,%d)", x, y);
-  display_text(0, 0, mouse_position, font);
+  sprintf(mouse_position, "Cursor: (%d,%d)", x, y);
+  display_text(0, 20, mouse_position, font);
 
   for (int i = 0; i < gs.messages_to_display.size(); ++i) {
     if (!gs.messages_to_display[i].empty()) {
-      display_text(0, i * 20 + 20, gs.messages_to_display[i].c_str(), font);
+      display_text(0, i * 20 + 40, gs.messages_to_display[i].c_str(), font);
     }
   }
 
@@ -391,16 +412,27 @@ int launch_game(const LaunchFlags& launch_flags) {
   gs.mode = GameState::CommandMode::kGalacticOverivew;
   gs.launch_flags = &launch_flags;
   gs.running = true;
-  gs.spawn_acc = false;
 
   if (PerformInitialization(gs) != 0) {
     return 1;
   }
 
   while (gs.running) {
+    const auto frame_start = std::chrono::steady_clock::now();
     GameLoop(gs);
+    const auto game_loop_end = std::chrono::steady_clock::now();
+    // Could consider skipping rendering ever other frame either in
+    // general, or if too much time has passed.
+    // https://gamedev.stackexchange.com/q/1589 has discussion on this point.
     Render(gs);
-    int milliseconds = 10;
+    const auto render_end = std::chrono::steady_clock::now();
+
+    gs.last_frame = std::chrono::duration_cast<std::chrono::milliseconds>(
+        render_end - frame_start);
+    gs.last_frame_render = std::chrono::duration_cast<std::chrono::milliseconds>(
+        render_end - game_loop_end);
+
+    int milliseconds = 1000 / FRAMES_PER_SECOND;
     SDL_Delay(milliseconds);
   }
   /* Frees memory */
