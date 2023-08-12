@@ -68,9 +68,7 @@ velocity curve fitting the characteristics outlined above.
 \end{figure}
 
 For a more complete example, see
-\url{https://www.desmos.com/calculator/ynqawea161}.
-
-
+\url{https://www.desmos.com/calculator/o8gxdsnxgw}.
 
 Since acceleration is the derivative of velocity with respect to time, this
 also allows us to deduce the velocity formula. We deduce the constants
@@ -115,6 +113,31 @@ terms of $k$ and given values.
 \end{align*}
 
 \subsection*{Solving for k}
+
+We know that the total distance travelled is $D$ and this
+can be represented as the sum of two integrals.
+
+\begin{align*}
+  D &= \int_0^f V(t)dt \\
+    &= \int_0^k V(t)dt + \int_k^f V(t)dt \\
+  \intertext{For the first integral, the distance is $v_0k$ due to constant
+  velocity.  For the second, since the deceleration is constant, the
+  distance is half the distance as if the entire time was at speed $v_0$}
+    &=  v_0k + \frac{(f-k)v_0}{2}
+  \intertext{We can then substitute equation (1) and solve for $k$ directly}
+  D &= v_0k + \left(\frac{v_0}{a} + k - k\right)\frac{v_0}{2} \\
+  D &= v_0k + \frac{v_0^2}{2a} \\
+  k &= \left(D - \frac{v_0^2}{2a}\right)/v_0
+\end{align*}
+
+
+
+\subsection*{Deprecated: Solving for k}
+
+If we went forward with the method below, but plug in f
+before expanding the terms incrorrectly, we'll see that 0=0.
+
+True but not helpful.  Ignore the rest of the document.
 
 Now we are ready to eliminate the stop time $f$ from the equation $X(t)$
 using equation (1) above.
@@ -176,8 +199,6 @@ distance of $D$, which is the definite integral of $V(t)$ over this time:
     - \frac{v_0^2}{2a} + \frac{v_0^2}{a} - \frac{v_0^2}{2a} + D \\
   0 &= k^2 (a - a) - \frac{kv_0}{2} \\
   0 &= - \frac{kv_0}{2} \\
-  0 &= k
-  \intertext{...uh oh}
 \end{align*}
 
 \end{document}
