@@ -185,20 +185,20 @@ struct SpaceObject {
     speed = std::min(speed, max_speed);
 
     // If we are getting too close to our destination, cut the acceleration.
-    if (speed > 2 * distance_to_waypoint)
+    // k = time at which to cut the acceleration
+    // k = D - (v_0 * v_0 / (2a)) / v_0.
 
     center_position.x += speed * cos(heading);
     // Reverse the y of motion for drawing.
     center_position.y -= speed * sin(heading);
 
-      char buffer[100];
-      int size = sprintf(
-          buffer, "Heading diff was %.2f which was less than %.2f)",
-          angle, FLOAT_COMPARATOR);
-      std::string heading_diff_log = std::string(buffer);
-      heading_diff_log.resize(size);
-      log_messages.push_back(heading_diff_log);
-    } else {
+    //  char buffer[100];
+    //  int size = sprintf(
+    //      buffer, "Heading diff was %.2f which was less than %.2f)",
+    //      angle, FLOAT_COMPARATOR);
+    //  std::string heading_diff_log = std::string(buffer);
+    //  heading_diff_log.resize(size);
+    //  log_messages.push_back(heading_diff_log);
     return log_messages;
   }
 };
