@@ -432,7 +432,7 @@ int launch_game(const LaunchFlags& launch_flags) {
     gs.last_frame_render = std::chrono::duration_cast<std::chrono::milliseconds>(
         render_end - game_loop_end);
 
-    int milliseconds = 1000 / FRAMES_PER_SECOND;
+    int milliseconds = 1000 / launch_flags.frames_per_second;
     SDL_Delay(milliseconds);
   }
   /* Frees memory */
@@ -460,13 +460,19 @@ bool attempt_flag_extraction(
 
 int main(int argc, char** argv) {
   LaunchFlags launch_flags;
+  std::string fps_string;
   for (int i = 0; i < argc; ++i) {
     std::string option = argv[i];
     attempt_flag_extraction(
         option, "--assets=", &launch_flags.assets_directory);
     attempt_flag_extraction(
         option, "--typeface=", &launch_flags.typeface_path);
+    attempt_flag_extraction(
+        option, "--framerate=", &fps_string);
   }
+  launch_flags.frames_per_second = 
+      fps_string.empty() ? FRAMES_PER_SECOND : atoi(fps_string.c_str());
+  printf("Setting fps to %d frames per second\n", launch_flags.frames_per_second);
   if (launch_flags.assets_directory.empty()) {
     printf("Must provide the directory from which to load assets via `--assets=`.\n");
     return 1;
