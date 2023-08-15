@@ -1,0 +1,8 @@
+Separate buildings for credits (to pay wages) and minerals (to build ships).
+Ships and units will have upkeep cost in credits based (unit size or crew size).
+Tax agencies will provide credits and mining facilities will provide minerals.
+Potentially other buildings to boost population/economy and thus tax income.
+Orbital bombardment in lieu of land battle option; decimates population/economy.
+
+Look into https://steamcommunity.com/workshop/filedetails/discussion/1770851727/3187990555101668413/
+and https://steamcommunity.com/sharedfiles/filedetails/?id=2329615204 for further ideas.
