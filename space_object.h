@@ -98,6 +98,7 @@ struct SpaceObject {
   // Returns log messages.
   std::vector<std::string> UpdateLocationAndVelocity() {
     std::vector<std::string> log_messages;
+    float distance_to_waypoint;
     if (waypoints.empty()) {
       if (speed > FLOAT_COMPARATOR) {
         speed = speed - acceleration;
@@ -111,10 +112,13 @@ struct SpaceObject {
       log_messages.push_back(speed_log);
       return log_messages;
     } else {
-      if (Distance(waypoints[waypoints.size() - 1], center_position) < FLOAT_COMPARATOR) {
+      distance_to_waypoint = Distance(waypoints[waypoints.size() - 1], center_position);
+      if (distance_to_waypoint < 30.0) {
+        // Close enough to the destination, consider it achieved.
         waypoints.pop_back();
         printf("Made it to destination, removing waypoint. Remaining waypoints %d\n",
                waypoints.size());
+        return log_messages;
       }
       char buffer[100];
       int size = sprintf(
@@ -155,42 +159,19 @@ struct SpaceObject {
     float angle = AngleBetween(heading, desired_radians);
     printf("delta_x: %d, delta_y: %d, heading: %.2f, desired_radians %.2f, angle %.2f\n",
            delta_x, delta_y, heading, desired_radians, angle);
-    // printf("Computed angle as %.2f\n", angle);
     if (std::abs(angle) < 0.01) {
+      // Close enough to the right heading, just set it.
       heading = desired_radians;
-
+      // Also accelerate toward our destination.
       speed += acceleration;
-      speed = std::min(speed, max_speed);
-
-      center_position.x += speed * cos(heading);
-      // Reverse the y of motion for drawing.
-      center_position.y -= speed * sin(heading);
-
-      char buffer[100];
-      int size = sprintf(
-          buffer, "Heading diff was %.2f which was less than %.2f)",
-          angle, FLOAT_COMPARATOR);
-      std::string heading_diff_log = std::string(buffer);
-      heading_diff_log.resize(size);
-      log_messages.push_back(heading_diff_log);
     } else {
-      // Otherwise, turn as we decelerate(?).
-      float before_rotation_heading = heading;
+      // Otherwise, turn.
       heading += rotational_acceleration * (angle < 0 ? -1 : 1);
-      // printf("Rotated from %.2f to %.2f\n", before_rotation_heading, heading);
       if (heading > PI) {
-        float old_heading = heading;
         heading -= 2 * PI;
-        // printf("Heading %.2f > PI, updating to %.2f\n",
-        //        (old_heading * 180) / PI,
-        //        (heading * 180) / PI);
       }
       if (heading <= -PI) {
-        float old_heading = heading;
         heading += 2 * PI;
-        // printf("Heading %.2f < -PI, updating to %.2f\n",
-        //        (old_heading * 180) / PI,
-        //        (heading * 180) / PI);
       }
       char buffer[100];
       int size = sprintf(
@@ -200,6 +181,24 @@ struct SpaceObject {
       heading_diff_log.resize(size);
       log_messages.push_back(heading_diff_log);
     }
+
+    speed = std::min(speed, max_speed);
+
+    // If we are getting too close to our destination, cut the acceleration.
+    if (speed > 2 * distance_to_waypoint)
+
+    center_position.x += speed * cos(heading);
+    // Reverse the y of motion for drawing.
+    center_position.y -= speed * sin(heading);
+
+      char buffer[100];
+      int size = sprintf(
+          buffer, "Heading diff was %.2f which was less than %.2f)",
+          angle, FLOAT_COMPARATOR);
+      std::string heading_diff_log = std::string(buffer);
+      heading_diff_log.resize(size);
+      log_messages.push_back(heading_diff_log);
+    } else {
     return log_messages;
   }
 };
