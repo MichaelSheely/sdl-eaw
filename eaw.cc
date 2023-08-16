@@ -257,6 +257,7 @@ int RenderUnits(GameState& gs) {
     if (gs.tactical_state.objects[i].selected) {
       RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2,
                         0.7 * bb.w, 0.7 * bb.h);
+      // TODO: Render health bar.
     }
   }
   return result;
@@ -344,6 +345,9 @@ int GameLoop(GameState& gs) {
     // HandleEvent(&event, &gs.running, &gs.spawn_acc);
     HandleEvent(&event, &gs);
   }
+  // TODO: Record mouse position for hover tooltips.
+  // Consider if pump (https://discourse.libsdl.org/t/mouse-over/10122)
+  // is necessary or if we can just check mouse state.
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
     gs.messages_to_display =
         gs.tactical_state.objects[i].UpdateLocationAndVelocity();

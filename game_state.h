@@ -22,9 +22,26 @@ struct GameState {
 
   std::vector<std::string> messages_to_display;
 
+  struct ItemUnderCursor {
+    enum class ItemType {
+      kSpaceObject;
+    };
+    // The type of item under the cursor.
+    ItemType item_type;
+    // We will maintain a map of items of each type which allows
+    // lookup by item id.
+    std::string item_key;
+    // Count of the game ticks during which the item was under the cursor.
+    int game_ticks_under_cursor = 0;
+  };
+  ItemUnderCursor item_under_cursor;
+
+
   struct SpaceTacticalState {
     // TODO: Consider converting to a map from layer to objects.
     // This will ensure data locality when it comes to drawing.
+    // TODO: Convert to flat map from object id to object so we can
+    // get constant time lookup.
     std::vector<SpaceObject> objects;
   };
   SpaceTacticalState tactical_state;
