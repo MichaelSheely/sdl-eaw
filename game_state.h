@@ -24,7 +24,7 @@ struct GameState {
 
   struct ItemUnderCursor {
     enum class ItemType {
-      kSpaceObject;
+      kSpaceObject,
     };
     // The type of item under the cursor.
     ItemType item_type;
