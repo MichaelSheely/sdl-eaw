@@ -6,3 +6,17 @@ Orbital bombardment in lieu of land battle option; decimates population/economy.
 
 Look into https://steamcommunity.com/workshop/filedetails/discussion/1770851727/3187990555101668413/
 and https://steamcommunity.com/sharedfiles/filedetails/?id=2329615204 for further ideas.
+
+Bugs:
+If heading is -3pi/4 and we direct to move to a heading at 3pi/4, rotation
+direction is incorrect.
+
+Sometimes we just completely fly off the screen, need to test more to determine
+when this occurs.
+
+Currently there is nothing stopping the objects from leaving the area.
+
+Improvements:
+Should be more lenient in terms of the difference between the current heading
+and the heading of the destination so we can keep moving even if the angle needs
+some further adjustment.
