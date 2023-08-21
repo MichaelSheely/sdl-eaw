@@ -96,7 +96,8 @@ struct SpaceObject {
     selected = false;
   }
   // Returns log messages.
-  std::vector<std::string> UpdateLocationAndVelocity() {
+  std::vector<std::string> UpdateLocationAndVelocity(
+      bool verbose_movement_logging) {
     std::vector<std::string> log_messages;
     float distance_to_waypoint;
     if (waypoints.empty()) {
@@ -157,8 +158,11 @@ struct SpaceObject {
 
     // Heading is close enough to start accelerating.
     float angle = AngleBetween(heading, desired_radians);
-    printf("delta_x: %d, delta_y: %d, heading: %.2f, desired_radians %.2f, angle %.2f\n",
-           delta_x, delta_y, heading, desired_radians, angle);
+    if (verbose_movement_logging) {
+      printf("delta_x: %d, delta_y: %d, heading: %.2f, "
+             "desired_radians %.2f, angle %.2f\n",
+             delta_x, delta_y, heading, desired_radians, angle);
+    }
     if (std::abs(angle) < 0.01) {
       // Close enough to the right heading, just set it.
       heading = desired_radians;

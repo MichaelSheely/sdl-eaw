@@ -350,7 +350,8 @@ int GameLoop(GameState& gs) {
   // is necessary or if we can just check mouse state.
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
     gs.messages_to_display =
-        gs.tactical_state.objects[i].UpdateLocationAndVelocity();
+        gs.tactical_state.objects[i].UpdateLocationAndVelocity(
+            gs.verbose_movement_logging);
   }
   return 0;
 }

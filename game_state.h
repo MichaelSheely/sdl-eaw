@@ -16,6 +16,7 @@ struct GameState {
   bool running = true;
   bool paused = false;
   bool spawn_acc = false;
+  bool verbose_movement_logging = false;
 
   std::chrono::microseconds last_frame;
   std::chrono::microseconds last_frame_render;
