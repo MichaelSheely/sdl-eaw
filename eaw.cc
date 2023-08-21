@@ -46,7 +46,7 @@ void MakeAcc(SpaceObject* acc) {
   acc->heading = -2.72;
   acc->draw_rotation = -2.72;
   acc->acceleration = 0.5;
-  acc->rotational_acceleration = 0.01;
+  acc->rotational_acceleration = 0.03;
   acc->max_speed = 15;
 }
 

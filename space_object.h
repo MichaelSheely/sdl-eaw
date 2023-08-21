@@ -163,7 +163,9 @@ struct SpaceObject {
              "desired_radians %.2f, angle %.2f\n",
              delta_x, delta_y, heading, desired_radians, angle);
     }
-    if (std::abs(angle) < 0.01) {
+    // TODO: Split into two braches.  If we are very close, set the value.
+    // If we are somewhat close, allow movement while turning continues.
+    if (std::abs(angle) < 0.05) {
       // Close enough to the right heading, just set it.
       heading = desired_radians;
       // Also accelerate toward our destination.
