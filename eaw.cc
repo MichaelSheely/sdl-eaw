@@ -164,6 +164,11 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
         gs->running = false;
       }
 
+      // Toggle pause status.
+      if (event->key.keysym.sym == SDLK_p ) {
+        gs->paused = !gs->paused;
+      }
+
       if (event->key.keysym.sym == SDLK_g ) {
         gs->mode = GameState::CommandMode::kGalacticOverivew;
       } else if (event->key.keysym.sym == SDLK_s) {
@@ -248,6 +253,12 @@ int RenderUnits(GameState& gs) {
     SDL_RenderDrawLine(renderer, obj.center_position.x, obj.center_position.y,
                        obj.center_position.x + 150 * cos(obj.heading),
                        obj.center_position.y - 150 * sin(obj.heading));
+    // Draw a line from the center of the object to the next goal.
+    if (!obj.waypoints.empty()) {
+      auto wp = obj.waypoints[obj.waypoints.size() - 1];
+      SDL_RenderDrawLine(
+          renderer, obj.center_position.x, obj.center_position.y, wp.x, wp.y);
+    }
     // printf("Heading: %.2f Draw Rotation: %.2f Final: %.2f\n",
     //        (obj.heading * 180) / PI,
     //        (obj.draw_rotation * 180) / PI,
@@ -349,6 +360,9 @@ int GameLoop(GameState& gs) {
   // Consider if pump (https://discourse.libsdl.org/t/mouse-over/10122)
   // is necessary or if we can just check mouse state.
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
+    if (gs.paused) {
+      break;
+    }
     gs.messages_to_display =
         gs.tactical_state.objects[i].UpdateLocationAndVelocity(
             gs.verbose_movement_logging);
@@ -426,8 +440,10 @@ int launch_game(const LaunchFlags& launch_flags) {
   // Test waypoint finding.
   SpaceObject acc;
   MakeAcc(&acc);
-  SDL_Point wp1 = { 260, 966 };
-  SDL_Point wp2 = { 157, 973 };
+  // SDL_Point wp1 = { 260, 966 };
+  // SDL_Point wp2 = { 157, 973 };
+  SDL_Point wp1 = { 183, 819 };
+  SDL_Point wp2 = { 404, 719 };
   acc.waypoints.push_back(wp1);
   acc.waypoints.push_back(wp2);
   gs.tactical_state.objects.push_back(acc);
