@@ -414,13 +414,23 @@ int Render(GameState& gs) {
 
 int launch_game(const LaunchFlags& launch_flags) {
   GameState gs;
-  gs.mode = GameState::CommandMode::kGalacticOverivew;
+  // gs.mode = GameState::CommandMode::kGalacticOverivew;
+  gs.mode = GameState::CommandMode::kSpaceTacticalView;
   gs.launch_flags = &launch_flags;
   gs.running = true;
 
   if (PerformInitialization(gs) != 0) {
     return 1;
   }
+
+  // Test waypoint finding.
+  SpaceObject acc;
+  MakeAcc(&acc);
+  SDL_Point wp1 = { 260, 966 };
+  SDL_Point wp2 = { 157, 973 };
+  acc.waypoints.push_back(wp1);
+  acc.waypoints.push_back(wp2);
+  gs.tactical_state.objects.push_back(acc);
 
   while (gs.running) {
     const auto frame_start = std::chrono::steady_clock::now();

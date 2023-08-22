@@ -50,7 +50,7 @@ float Distance(SDL_Point p1, SDL_Point p2) {
 // to most quickly reach radian2.
 float AngleBetween(float radian1, float radian2) {
   if (radian1 < -PI || radian1 > PI || radian2 < -PI || radian2 > PI) {
-    printf("WARNING: %.2f or %.2f is out of bounds.\n", radian1, radian2);
+    printf("WARNING: %.3f or %.3f is out of bounds.\n", radian1, radian2);
     return 0.0;
   }
   // Neet to consider both to determine which is the smaller angle
