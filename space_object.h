@@ -48,21 +48,27 @@ float Distance(SDL_Point p1, SDL_Point p2) {
 
 // Negative value indicates radian1 should move clockwise
 // to most quickly reach radian2.
-// TODO: Fixme. Gives the wrong answer when radian1 < 0, radian2 > 0
-// and the best path from radian1 to radian2 is to move clockwise.
 float AngleBetween(float radian1, float radian2) {
   if (radian1 < -PI || radian1 > PI || radian2 < -PI || radian2 > PI) {
     printf("WARNING: %.3f or %.3f is out of bounds.\n", radian1, radian2);
     return 0.0;
   }
-  // Neet to consider both to determine which is the smaller angle
-  // due to the modulus at +/- PI.
-  float angle_displacement1 = radian1 - radian2;
-  float angle_displacement2 = radian2 - radian1;
-  if (std::abs(angle_displacement1) < std::abs(angle_displacement2)) {
-    return angle_displacement1;
+  // First, we calculate the clockwise displacement to bring radian1 to radian2.
+  radian1 += (radian1 < radian2) ? 2 * PI : 0;
+  float cw_displacement = radian1 - radian2;
+  // Next, the counter clockwise displacement to bring radian1 to radian2.
+  radian2 += (radian1 > radian2) ? 2 * PI : 0;
+  float ccw_displacement = radian2 - radian1;
+  if (std::min(ccw_displacement, cw_displacement) > PI) {
+    printf("WARNING: Suggesting the shorter distance is %.3f %b\n",
+           std::min(ccw_displacement, cw_displacement),
+           ccw_displacement < cw_displacement);
+  }
+  // Both displacements guaranteed to be in the range [0, 2PI].
+  if (cw_displacement < ccw_displacement) {
+    return -cw_displacement;
   } else {
-    return angle_displacement2;
+    return ccw_displacement;
   }
 }
 
@@ -165,17 +171,25 @@ struct SpaceObject {
              "desired_radians %.2f, angle %.2f\n",
              delta_x, delta_y, heading, desired_radians, angle);
     }
+
+    size = sprintf(
+        buffer, "Need to move %.2f radians in %s direction",
+        fabs(angle), angle < 0 ? "clockwise" : "counter clockwise");
+    // Trim extra chars.
+    heading_log = std::string(buffer);
+    heading_log.resize(size);
+    log_messages.push_back(heading_log);
     // TODO: Split into two braches.  If we are very close, set the value.
     // If we are somewhat close, allow movement while turning continues.
-    if (std::abs(angle) < 0.05) {
-      // Close enough to the right heading, just set it.
-      heading = desired_radians;
+    if (fabs(angle) < 0.01 || fabs(angle) < rotational_acceleration) {
+      // Close enough to the right heading, no need for further rotation.
       // Also accelerate toward our destination.
       speed += acceleration;
+      // heading = desired_radians;
     } else {
       // Otherwise, turn.
       heading += rotational_acceleration * (angle < 0 ? -1 : 1);
-      if (heading > PI) {
+      if (heading >= PI) {
         heading -= 2 * PI;
       }
       if (heading <= -PI) {
@@ -183,8 +197,8 @@ struct SpaceObject {
       }
       char buffer[100];
       int size = sprintf(
-          buffer, "Heading was not close enough (%.2f vs %.2f), need to keep turning.",
-          std::abs(desired_radians - heading), FLOAT_COMPARATOR);
+          buffer, "Heading was not close enough (%.2f vs %.2f) diff: %.2f, need to keep turning.",
+          desired_radians, heading, angle);
       std::string heading_diff_log = std::string(buffer);
       heading_diff_log.resize(size);
       log_messages.push_back(heading_diff_log);
