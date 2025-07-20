@@ -17,7 +17,7 @@
 #define WINDOW_HEIGHT  1080
 #define FRAMES_PER_SECOND 5
 #define PI 3.14159265
-static const char kWindowTitle[] = "SDL Test";
+static const char kWindowTitle[] = "EAW";
 // SDL_WINDOW_FULLSCREEN SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_MAXIMIZED
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
@@ -501,7 +501,7 @@ int main(int argc, char** argv) {
     attempt_flag_extraction(
         option, "--framerate=", &fps_string);
   }
-  launch_flags.frames_per_second = 
+  launch_flags.frames_per_second =
       fps_string.empty() ? FRAMES_PER_SECOND : atoi(fps_string.c_str());
   printf("Setting fps to %d frames per second\n", launch_flags.frames_per_second);
   if (launch_flags.assets_directory.empty()) {
