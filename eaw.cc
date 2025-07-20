@@ -271,7 +271,7 @@ int RenderUnits(GameState& gs) {
     //     renderer, gs.tactical_state.objects[i].texture, NULL, &bb);
     if (gs.tactical_state.objects[i].selected) {
       RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2,
-                        0.7 * bb.w, 0.7 * bb.h);
+                        0.5 * bb.w, 0.7 * bb.h);
       // TODO: Render health bar.
     }
   }
@@ -440,19 +440,22 @@ int launch_game(const LaunchFlags& launch_flags) {
   gs.launch_flags = &launch_flags;
   gs.running = true;
 
-  if (PerformInitialization(gs) != 0) {
-    return 1;
+  int initialization_result = PerformInitialization(gs);
+  if (initialization_result != 0) {
+    return initialization_result;
   }
 
   // Test waypoint finding.
   SpaceObject acc;
   MakeAcc(&acc);
-  SDL_Point wp1 = { 260, 966 };
-  SDL_Point wp2 = { 157, 973 };
+  // These are good test cases to ensure that waypoint navigation
+  // logic is working as intended.  Uncomment to test.
+  // SDL_Point wp1 = { 260, 966 };
+  // SDL_Point wp2 = { 157, 973 };
   // SDL_Point wp1 = { 183, 819 };
   // SDL_Point wp2 = { 404, 719 };
-  acc.waypoints.push_back(wp1);
-  acc.waypoints.push_back(wp2);
+  // acc.waypoints.push_back(wp1);
+  // acc.waypoints.push_back(wp2);
   gs.tactical_state.objects.push_back(acc);
 
   while (gs.running) {
