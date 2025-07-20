@@ -46,9 +46,20 @@ float Distance(SDL_Point p1, SDL_Point p2) {
   return sqrt(dx * dx + dy * dy);
 }
 
+float AngleBetween(float radian1, float radian2) {
+  float diff = fmod(radian2 - radian1, 2 * PI);
+  if (diff > PI) {
+    diff -= 2 * PI;
+  }
+  if (diff < -PI) {
+    diff += 2 * PI;
+  }
+  return diff;
+}
+
 // Negative value indicates radian1 should move clockwise
 // to most quickly reach radian2.
-float AngleBetween(float radian1, float radian2) {
+float OldAngleBetween(float radian1, float radian2) {
   if (radian1 < -PI || radian1 > PI || radian2 < -PI || radian2 > PI) {
     printf("WARNING: %.3f or %.3f is out of bounds.\n", radian1, radian2);
     return 0.0;
@@ -131,8 +142,8 @@ struct SpaceObject {
       }
       char buffer[100];
       int size = sprintf(
-          buffer, "Distance to waypoint is still %.2f",
-          Distance(waypoints[waypoints.size() - 1], center_position));
+          buffer, "Distance to waypoint is %.2f, speed is %.2f",
+          Distance(waypoints[waypoints.size() - 1], center_position), speed);
       std::string distance_remaining = std::string(buffer);
       distance_remaining.resize(size);
       log_messages.push_back(distance_remaining);
@@ -185,7 +196,7 @@ struct SpaceObject {
       // Close enough to the right heading, no need for further rotation.
       // Also accelerate toward our destination.
       speed += acceleration;
-      // heading = desired_radians;
+      heading = desired_radians;
     } else {
       // Otherwise, turn.
       heading += rotational_acceleration * (angle < 0 ? -1 : 1);
