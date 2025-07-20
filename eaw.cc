@@ -44,6 +44,11 @@ void MakeAcc(SpaceObject* acc) {
   acc->center_position = { 400, 600 };
   acc->texture = acc_texture;
   acc->layer = kFrigateCruiserLayer;
+
+  acc->current_shield = 100;
+  acc->current_hull = 100;
+  acc->max_shield = 100;
+  acc->max_hull = 100;
   // Based on image texture, computed the approximate
   // heading of the initial image.
   acc->heading = 0;         // -2.72;
@@ -240,6 +245,26 @@ int RenderBlueEllipse(int x, int y, int rx, int ry) {
   return ellipseRGBA(renderer, x, y, rx, ry, 0, 100, 0, 0);
 }
 
+int RenderHealth(const SpaceObject& obj, const SDL_Rect& bb) {
+  // Render health above the unit.
+  float health_starting_x = bb.x;
+  float health_height = bb.y - bb.h * 0.5;
+  float shield_frac = obj.current_shield / obj.max_shield;
+  float hull_frac = obj.current_hull / obj.max_hull;
+  float shield_x = health_starting_x + shield_frac * bb.w;
+  float hull_x = health_starting_x + hull_frac * bb.w;
+
+  // Light blue shields.
+  SDL_SetRenderDrawColor(renderer, 0x00, 0xa5, 0xFF, 0x00);
+  SDL_RenderDrawLine(
+      renderer, health_starting_x, health_height, shield_x, health_height);
+  // Light green hull.
+  SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0x00);
+  SDL_RenderDrawLine(
+      renderer, health_starting_x, health_height + 3, hull_x, health_height + 3);
+  return 0;
+}
+
 // For true 3d rendering, see:
 // https://www.khronos.org/opengl/wiki/Tutorial3:_Rendering_3D_Objects_(C_/SDL)
 int RenderUnits(GameState& gs) {
@@ -272,7 +297,8 @@ int RenderUnits(GameState& gs) {
     if (gs.tactical_state.objects[i].selected) {
       RenderBlueEllipse(bb.x + bb.w / 2, bb.y + bb.h / 2,
                         0.5 * bb.w, 0.7 * bb.h);
-      // TODO: Render health bar.
+      // TODO: Also render health bar if unit is under mouse.
+      RenderHealth(gs.tactical_state.objects[i], bb);
     }
   }
   return result;
@@ -378,7 +404,7 @@ int GameLoop(GameState& gs) {
 
 int Render(GameState& gs) {
   // Clear any garbage which was pre-existing in the rendering flow.
-  SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
+  // SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
   SDL_RenderClear(renderer);
   SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
 

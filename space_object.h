@@ -65,6 +65,11 @@ struct SpaceObject {
   SDL_Texture* texture;
   int width;
   int height;
+
+  int current_shield;
+  int current_hull;
+  int max_shield;
+  int max_hull;
   Layer layer;
   // In radians, from -pi to pi.
   float heading;
