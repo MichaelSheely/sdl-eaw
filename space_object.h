@@ -76,6 +76,7 @@ struct SpaceObject {
   // If empty, we're already where we want to be.
   std::vector<SDL_Point> waypoints;
   bool selected = false;
+
   void GetBoundingBox(SDL_Rect* rect) const {
     rect->x = center_position.x - (width / 2);
     rect->y = center_position.y - (height / 2);
@@ -88,6 +89,27 @@ struct SpaceObject {
   void Deselect() {
     selected = false;
   }
+
+  bool ShouldDecelerate(float distance_to_waypoint, float angle_to_waypoint) {
+    // Linear deceleration.
+    float distance_needed_to_decelerate = speed * speed / acceleration;
+    if (distance_to_waypoint < distance_needed_to_decelerate) {
+      return true;
+    }
+
+    // Slow down if our target requires rotation such that our linear
+    // speed would otherwise cause us to overshoot / orbit destination.
+    float time_to_turn = fabs(angle_to_waypoint) / rotational_acceleration;
+    float distance_covered_while_turning = speed * time_to_turn;
+    // Tune this and make constant.
+    float turn_buffer = 2.0;
+    if (distance_to_waypoint < distance_covered_while_turning * turn_buffer) {
+      return true;
+    }
+
+    return false;
+  }
+
   // Returns log messages.
   std::vector<std::string> UpdateLocationAndVelocity(
       bool verbose_movement_logging) {
@@ -168,9 +190,13 @@ struct SpaceObject {
     // If we are somewhat close, allow movement while turning continues.
     if (fabs(angle) < 0.01 || fabs(angle) < rotational_acceleration) {
       // Close enough to the right heading, no need for further rotation.
-      // Also accelerate toward our destination.
-      speed += acceleration;
       heading = desired_radians;
+
+      if (ShouldDecelerate(distance_to_waypoint, angle)) {
+        speed -= acceleration;
+      } else {
+        speed += acceleration;
+      }
     } else {
       // Otherwise, turn.
       heading += rotational_acceleration * (angle < 0 ? -1 : 1);
@@ -180,6 +206,10 @@ struct SpaceObject {
       if (heading <= -PI) {
         heading += 2 * PI;
       }
+      if (ShouldDecelerate(distance_to_waypoint, angle)) {
+        speed -= acceleration;
+      }
+
       char buffer[100];
       int size = sprintf(
           buffer, "Heading was not close enough (%.2f vs %.2f) diff: %.2f, need to keep turning.",
@@ -190,6 +220,8 @@ struct SpaceObject {
     }
 
     speed = std::min(speed, max_speed);
+    // Spaceships can only accelerate using their engines (no reverse).
+    speed = std::max(speed, 0.0f);
 
     // If we are getting too close to our destination, cut the acceleration.
     // k = time at which to cut the acceleration
