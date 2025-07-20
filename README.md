@@ -38,6 +38,14 @@ Debug that basic SDL is working in windows:
 $ g++ debug.cc -o debug.exe -I "/mingw64/include/SDL2" -lmingw32 -lSDL2main -lSDL2
 ```
 
+To run the full program on windows:
+
+```
+$ g++ -o eaw.exe eaw.cc draw_circle.cc -I "/mingw64/include/SDL2" -lmingw32
+-lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf && \
+./eaw --assets='/path/to/image/assets' --typeface='/path/to/typeface.ttf'
+```
+
 ### Attributions
 
 Some code for circle drawing in SDL2 cribbed from
