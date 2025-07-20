@@ -23,6 +23,8 @@ static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
 static SDL_Window* g_window;
 static SDL_Renderer* renderer;
 static SDL_Texture* acc_texture;
+static SDL_Texture* gc_map_texture;
+static SDL_Texture* pleiades_texture;
 static TTF_Font* font;
 // 1266x768. Replace with a better galaxy map.
 const char kGCMapFilename[] = "gc_map_placeholder.jpg";
@@ -30,6 +32,7 @@ const char kGCMapFilename[] = "gc_map_placeholder.jpg";
 const char kPleiadesFilename[] = "pleiades_1024x738.jpg";
 // 789x400 from https://www.swcombine.com/rules/?Capital_Ships&ID=91
 const char kAcclamatorFilename[] = "acclamator.png";
+
 
 void MakeAcc(SpaceObject* acc) {
   // TODO: Generate real uuid.
@@ -43,11 +46,11 @@ void MakeAcc(SpaceObject* acc) {
   acc->layer = kFrigateCruiserLayer;
   // Based on image texture, computed the approximate
   // heading of the initial image.
-  acc->heading = -2.72;
-  acc->draw_rotation = -2.72;
+  acc->heading = 0;         // -2.72;
+  acc->draw_rotation = PI;  //  -2.72;
   acc->acceleration = 0.5;
   acc->rotational_acceleration = 0.03;
-  acc->max_speed = 15;
+  acc->max_speed = 10;
 }
 
 // Returns if still running.
@@ -80,6 +83,12 @@ void SetDestinationForAllSelectedUnits(GameState* gs, int x, int y) {
   }
 }
 
+void DeselectAllUnits(GameState* gs) {
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    gs->tactical_state.objects[i].Deselect();
+  }
+}
+
 // Returns whether or not there was a unit under the cursor.
 bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y) {
   for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
@@ -88,17 +97,12 @@ bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y) {
     obj.GetBoundingBox(&bb);
     if ((bb.x < x && x < bb.x + bb.w) &&
         (bb.y < y && y < bb.y + bb.h)) {
+      DeselectAllUnits(gs);
       obj.Select();
       return true;
     }
   }
   return false;
-}
-
-void DeselectAllUnits(GameState* gs) {
-  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
-    gs->tactical_state.objects[i].Deselect();
-  }
 }
 
 void HandleEvent(SDL_Event* event, GameState* gs) {
@@ -274,19 +278,16 @@ int RenderUnits(GameState& gs) {
   return result;
 }
 
-int RenderBackground(const std::string& assets_directory,
-                     GameState::CommandMode mode) {
+int RenderBackground(GameState::CommandMode mode) {
   SDL_Texture* texture = NULL;
   std::string bg_filename;
   switch (mode) {
     case GameState::CommandMode::kSpaceTacticalView:
-      bg_filename = kPleiadesFilename;
+      texture = pleiades_texture;
       break;
     default:
-      bg_filename = kGCMapFilename;
+      texture = gc_map_texture;
   }
-  texture = IMG_LoadTexture(
-      renderer, (assets_directory + bg_filename).c_str());
   return SDL_RenderCopy(renderer, texture, NULL, NULL);
 }
 
@@ -311,6 +312,7 @@ void display_text(int x, int y, const char* text, TTF_Font* font) {
   if (SDL_RenderCopy(renderer, texture, NULL, &rect) != 0) {
     printf("Failed to write text due to: %s\n", SDL_GetError());
   }
+  SDL_DestroyTexture(texture);
 }
 
 int PerformInitialization(const GameState& gs) {
@@ -344,6 +346,10 @@ int PerformInitialization(const GameState& gs) {
 
   acc_texture = IMG_LoadTexture(
       renderer, (gs.launch_flags->assets_directory + kAcclamatorFilename).c_str());
+  gc_map_texture = IMG_LoadTexture(
+      renderer, (gs.launch_flags->assets_directory + kGCMapFilename).c_str());
+  pleiades_texture = IMG_LoadTexture(
+      renderer, (gs.launch_flags->assets_directory + kPleiadesFilename).c_str());
   return 0;
 }
 
@@ -378,11 +384,12 @@ int Render(GameState& gs) {
 
   SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
 
-  if (RenderBackground(gs.launch_flags->assets_directory, gs.mode) != 0) {
+  if (RenderBackground(gs.mode) != 0) {
     return 1;
   }
 
-  if (RenderUnits(gs) != 0) {
+  if (gs.mode == GameState::CommandMode::kSpaceTacticalView
+      && RenderUnits(gs) != 0) {
     printf("Failed to render: %s\n", SDL_GetError());
     return 1;
   }
@@ -440,10 +447,10 @@ int launch_game(const LaunchFlags& launch_flags) {
   // Test waypoint finding.
   SpaceObject acc;
   MakeAcc(&acc);
-  // SDL_Point wp1 = { 260, 966 };
-  // SDL_Point wp2 = { 157, 973 };
-  SDL_Point wp1 = { 183, 819 };
-  SDL_Point wp2 = { 404, 719 };
+  SDL_Point wp1 = { 260, 966 };
+  SDL_Point wp2 = { 157, 973 };
+  // SDL_Point wp1 = { 183, 819 };
+  // SDL_Point wp2 = { 404, 719 };
   acc.waypoints.push_back(wp1);
   acc.waypoints.push_back(wp2);
   gs.tactical_state.objects.push_back(acc);
