@@ -5,3 +5,5 @@ debug
 debug.exe
 # Don't commit asset files to github.
 assets
+# Vim swap files.
+*.swp
