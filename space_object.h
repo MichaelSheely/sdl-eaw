@@ -57,32 +57,6 @@ float AngleBetween(float radian1, float radian2) {
   return diff;
 }
 
-// Negative value indicates radian1 should move clockwise
-// to most quickly reach radian2.
-float OldAngleBetween(float radian1, float radian2) {
-  if (radian1 < -PI || radian1 > PI || radian2 < -PI || radian2 > PI) {
-    printf("WARNING: %.3f or %.3f is out of bounds.\n", radian1, radian2);
-    return 0.0;
-  }
-  // First, we calculate the clockwise displacement to bring radian1 to radian2.
-  radian1 += (radian1 < radian2) ? 2 * PI : 0;
-  float cw_displacement = radian1 - radian2;
-  // Next, the counter clockwise displacement to bring radian1 to radian2.
-  radian2 += (radian1 > radian2) ? 2 * PI : 0;
-  float ccw_displacement = radian2 - radian1;
-  if (std::min(ccw_displacement, cw_displacement) > PI) {
-    printf("WARNING: Suggesting the shorter distance is %.3f %b\n",
-           std::min(ccw_displacement, cw_displacement),
-           ccw_displacement < cw_displacement);
-  }
-  // Both displacements guaranteed to be in the range [0, 2PI].
-  if (cw_displacement < ccw_displacement) {
-    return -cw_displacement;
-  } else {
-    return ccw_displacement;
-  }
-}
-
 struct SpaceObject {
   SDL_Point center_position;
   std::string object_id;
