@@ -1,3 +1,7 @@
 # Main executable
 eaw
-
+eaw.exe
+debug
+debug.exe
+# Don't commit asset files to github.
+assets
