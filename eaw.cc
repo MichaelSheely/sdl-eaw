@@ -95,14 +95,16 @@ void DeselectAllUnits(GameState* gs) {
 }
 
 // Returns whether or not there was a unit under the cursor.
-bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y) {
+bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y, bool deselect_others) {
   for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
     SpaceObject& obj = gs->tactical_state.objects[i];
     SDL_Rect bb;
     obj.GetBoundingBox(&bb);
     if ((bb.x < x && x < bb.x + bb.w) &&
         (bb.y < y && y < bb.y + bb.h)) {
-      DeselectAllUnits(gs);
+      if (deselect_others) {
+        DeselectAllUnits(gs);
+      }
       obj.Select();
       return true;
     }
@@ -111,6 +113,7 @@ bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y) {
 }
 
 void HandleEvent(SDL_Event* event, GameState* gs) {
+  SDL_Keymod modState = SDL_GetModState();
   switch(event->type) {
     case SDL_CONTROLLERDEVICEADDED:
       // OpenOneGamepad(event->cdevice.which);
@@ -137,7 +140,8 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
         if (gs->mode == GameState::CommandMode::kGalacticOverivew) {
           // Handle appropriately.
         } else if (gs->mode == GameState::CommandMode::kSpaceTacticalView) {
-          if (!MarkUnitUnderCursorSelected(gs, event->button.x, event->button.y)) {
+          bool deselect_others = !(modState & KMOD_SHIFT);
+          if (!MarkUnitUnderCursorSelected(gs, event->button.x, event->button.y, deselect_others)) {
             DeselectAllUnits(gs);
           }
         }
