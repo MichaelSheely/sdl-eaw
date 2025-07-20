@@ -24,7 +24,8 @@ struct GameState {
   std::vector<std::string> messages_to_display;
 
   struct ItemUnderCursor {
-    enum class ItemType {
+    enum ItemType {
+      kNone,
       kSpaceObject,
     };
     // The type of item under the cursor.
@@ -44,6 +45,10 @@ struct GameState {
     // TODO: Convert to flat map from object id to object so we can
     // get constant time lookup.
     std::vector<SpaceObject> objects;
+
+    // Quick access groupings.  There are only 10 number keys on keyboard,
+    // so we hard code to 10 groupings.
+    std::vector<std::string> unit_groupings[10];
   };
   SpaceTacticalState tactical_state;
 };

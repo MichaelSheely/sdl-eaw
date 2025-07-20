@@ -1,3 +1,4 @@
+#include <cassert>
 #include <chrono>
 #include <math.h>
 #include <stdint.h>
@@ -17,6 +18,7 @@
 #define WINDOW_HEIGHT  1080
 #define FRAMES_PER_SECOND 5
 #define PI 3.14159265
+static const int kTooltipDelayRequirement = 20;
 static const char kWindowTitle[] = "EAW";
 // SDL_WINDOW_FULLSCREEN SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_MAXIMIZED
 static uint32_t g_win_flags = SDL_WINDOW_RESIZABLE;
@@ -44,6 +46,7 @@ void MakeAcc(SpaceObject* acc) {
   acc->center_position = { 400, 600 };
   acc->texture = acc_texture;
   acc->layer = kFrigateCruiserLayer;
+  acc->tooltip = "Acclamator-class transgalactic military assault ship.";
 
   acc->current_shield = 100;
   acc->current_hull = 100;
@@ -94,6 +97,30 @@ void DeselectAllUnits(GameState* gs) {
   }
 }
 
+void RecordItemUnderCursor(GameState* gs) {
+  int x,y;
+  SDL_GetMouseState(&x, &y);
+
+  for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
+    SpaceObject& obj = gs->tactical_state.objects[i];
+    SDL_Rect bb;
+    obj.GetBoundingBox(&bb);
+    if ((bb.x < x && x < bb.x + bb.w) &&
+        (bb.y < y && y < bb.y + bb.h)) {
+      if (gs->item_under_cursor.item_type != GameState::ItemUnderCursor::kNone &&
+          gs->item_under_cursor.item_key == obj.object_id) {
+        gs->item_under_cursor.game_ticks_under_cursor += 1;
+        return;
+      }
+      gs->item_under_cursor.item_type = GameState::ItemUnderCursor::kSpaceObject;
+      gs->item_under_cursor.item_key = obj.object_id;
+      gs->item_under_cursor.game_ticks_under_cursor = 1;
+      return;
+    }
+  }
+  gs->item_under_cursor.item_type = GameState::ItemUnderCursor::kNone;
+}
+
 // Returns whether or not there was a unit under the cursor.
 bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y, bool deselect_others) {
   for (int i = 0; i < gs->tactical_state.objects.size(); ++i) {
@@ -110,6 +137,36 @@ bool MarkUnitUnderCursorSelected(GameState* gs, int x, int y, bool deselect_othe
     }
   }
   return false;
+}
+
+void GroupSelectedUnits(GameState* gs, SDL_Keycode keycode) {
+  // We have already confirmed that the keycode was a number [0, 9].
+  // enum 48 -> 0
+  // enum 49 -> 1
+  // ...
+  // enum 57 -> 9
+  int group = keycode - 48;
+  assert(group >= 0 && group < 10);
+  // Clean up any units currently in this group.
+  gs->tactical_state.unit_groupings[group].clear();
+
+  for (const SpaceObject& obj : gs->tactical_state.objects) {
+    if (obj.selected) {
+      gs->tactical_state.unit_groupings[group].push_back(obj.object_id);
+    }
+  }
+}
+
+void SelectByGroup(GameState* gs, SDL_Keycode keycode) {
+  int group = keycode - 48;
+  assert(group >= 0 && group < 10);
+  for (SpaceObject& obj : gs->tactical_state.objects) {
+    for (const std::string& unit_id : gs->tactical_state.unit_groupings[group]) {
+      if (unit_id == obj.object_id) {
+        obj.Select();
+      }
+    }
+  }
 }
 
 void HandleEvent(SDL_Event* event, GameState* gs) {
@@ -167,6 +224,25 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
       // }
       break;
     case SDL_KEYDOWN:
+      switch (event->key.keysym.sym) {
+        case SDLK_0:
+        case SDLK_1:
+        case SDLK_2:
+        case SDLK_3:
+        case SDLK_4:
+        case SDLK_5:
+        case SDLK_6:
+        case SDLK_7:
+        case SDLK_8:
+        case SDLK_9:
+          printf("Got keypress %d, ctr: %d\n", event->key.keysym.sym, modState & KMOD_CTRL);
+          if (modState & KMOD_CTRL) {
+            GroupSelectedUnits(gs, event->key.keysym.sym);
+          } else {
+            SelectByGroup(gs, event->key.keysym.sym);
+          }
+          return;
+      }
       if (event->key.keysym.sym == SDLK_x ) {
         ClearWaypointsForSelected(gs);
       } else if (event->key.keysym.sym == SDLK_t) {
@@ -200,7 +276,7 @@ void HandleEvent(SDL_Event* event, GameState* gs) {
     case SDL_QUIT:
       gs->running = false;
       break;
-    }
+  }
 }
 
 void DefaultRect(SDL_Rect* rect) {
@@ -283,6 +359,7 @@ int RenderUnits(GameState& gs) {
         ((obj.draw_rotation - obj.heading) * 180) / PI,
         NULL /*rotate around center */, SDL_FLIP_NONE);
     // Annotate the heading of the unit.
+    SDL_SetRenderDrawColor(renderer, 100, 100, 0, 0);
     SDL_RenderDrawLine(renderer, obj.center_position.x, obj.center_position.y,
                        obj.center_position.x + 150 * cos(obj.heading),
                        obj.center_position.y - 150 * sin(obj.heading));
@@ -392,7 +469,7 @@ int GameLoop(GameState& gs) {
     // HandleEvent(&event, &gs.running, &gs.spawn_acc);
     HandleEvent(&event, &gs);
   }
-  // TODO: Record mouse position for hover tooltips.
+  RecordItemUnderCursor(&gs);
   // Consider if pump (https://discourse.libsdl.org/t/mouse-over/10122)
   // is necessary or if we can just check mouse state.
   for (int i = 0; i < gs.tactical_state.objects.size(); ++i) {
@@ -406,11 +483,27 @@ int GameLoop(GameState& gs) {
   return 0;
 }
 
+const std::string* GetTooltip(const GameState& gs) {
+  if (gs.item_under_cursor.item_type == GameState::ItemUnderCursor::kNone ||
+      gs.item_under_cursor.game_ticks_under_cursor < kTooltipDelayRequirement) {
+    return nullptr;
+  }
+  if (gs.item_under_cursor.item_type ==
+      GameState::ItemUnderCursor::kSpaceObject) {
+    for (const SpaceObject& obj : gs.tactical_state.objects) {
+      if (obj.object_id == gs.item_under_cursor.item_key) {
+        return &obj.tooltip;
+      }
+    }
+  }
+  return nullptr;
+}
+
 int Render(GameState& gs) {
   // Clear any garbage which was pre-existing in the rendering flow.
   // SDL_SetRenderDrawColor(renderer, 0, 0, 150, 0);
   SDL_RenderClear(renderer);
-  SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
+  // SDL_SetRenderDrawColor(renderer, 100, 0, 0, 0);
 
   SDL_ShowCursor(SDL_ENABLE /* or SDL_DISABLE if mouse not needed*/);
 
@@ -441,6 +534,11 @@ int Render(GameState& gs) {
     if (!gs.messages_to_display[i].empty()) {
       display_text(0, i * 20 + 40, gs.messages_to_display[i].c_str(), font);
     }
+  }
+
+  const std::string* tooltip = GetTooltip(gs);
+  if (tooltip) {
+    display_text(0, WINDOW_HEIGHT - 30, tooltip->c_str(), font);
   }
 
   // Draw a small rectangle at the point of the cursor.

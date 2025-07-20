@@ -81,6 +81,7 @@ struct SpaceObject {
   // If empty, we're already where we want to be.
   std::vector<SDL_Point> waypoints;
   bool selected = false;
+  std::string tooltip;
 
   void GetBoundingBox(SDL_Rect* rect) const {
     rect->x = center_position.x - (width / 2);
